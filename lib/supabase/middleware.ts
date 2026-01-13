@@ -3,14 +3,12 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-export const createClient = (request: NextRequest) => {
+export async function updateSession(request: NextRequest) {
   // Create an unmodified response
   let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request
   });
 
   const supabase = createServerClient(
@@ -33,6 +31,21 @@ export const createClient = (request: NextRequest) => {
       },
     },
   );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if(request.nextUrl.pathname == '/signin' && user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+    if(request.nextUrl.pathname === '/dashboard' && !user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/signin'
+      return NextResponse.redirect(url)
+    }
 
   return supabaseResponse
 };

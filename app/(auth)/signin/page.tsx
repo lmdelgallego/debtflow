@@ -74,7 +74,7 @@ const SigninContent = () => {
     },
   })
 
-  const nextPath = searchParams.get("next") ?? "/"
+  const nextPath = searchParams.get("next") ?? "/dashboard"
 
   useEffect(() => {
     if (authLoading) return
@@ -114,8 +114,10 @@ const SigninContent = () => {
       email: data.email,
       password: data.password,
     })
+    router.replace(nextPath)
 
     if (!error) return
+
 
     setSubmitting(false)
     setErrorMessage(error.message)

@@ -2,7 +2,7 @@
 
 import MaxWidthWrapper from './MaxWidthWrapper'
 import Link from 'next/link'
-import { buttonVariants } from './ui/button'
+import { Button, buttonVariants } from './ui/button'
 
 import { useAuth } from '@/context/auth-context'
 import { useRouter } from 'next/dist/client/components/navigation'
@@ -13,6 +13,10 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     await signOut();
+    router.replace("/");
+  };
+
+  const handleSignIn = () => {
     router.push("/signin");
   };
 
@@ -32,13 +36,14 @@ const Navbar = () => {
                   })}>
                   Pricing
                 </Link>
-                {/* <LoginLink
+                <Button
+                  onClick={handleSignIn}
                   className={buttonVariants({
                     variant: 'ghost',
                     size: 'sm',
                   })}>
                   Sign in
-                </LoginLink> */}
+                </Button>
                 {/* <RegisterLink
                   className={buttonVariants({
                     size: 'sm',
@@ -57,6 +62,14 @@ const Navbar = () => {
                   })}>
                   Dashboard
                 </Link>
+                  <Button
+                    onClick={handleLogout}
+                    className={buttonVariants({
+                      variant: 'ghost',
+                      size: 'sm',
+                    })}>
+                    Sign out
+                  </Button>
 
                 {/* <UserAccountNav
                   name={
