@@ -67,8 +67,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center py-10">
-      <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Crear cuenta</CardTitle>
           <CardDescription className="text-center">
@@ -144,7 +143,6 @@ export default function SignupPage() {
             </Link>
           </p>
         </CardFooter>
-      </Card>
-    </div>
+    </Card>
   )
 }

@@ -15,6 +15,19 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { useAuth } from "@/context/auth-context"
+import { useForm } from "react-hook-form"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import z from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { Input } from "@/components/ui/input"
+import { GoogleIcon } from "@/components/ui/icon-google"
 
 type OAuthProvider = "google"
 
@@ -22,7 +35,6 @@ export default function SigninPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center py-10">
           <Card className="w-full max-w-md">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-center">
@@ -31,20 +43,19 @@ export default function SigninPage() {
               <CardDescription className="text-center">
                 Cargando...
               </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" disabled aria-label="Cargando">
-                Continuar con Google
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+          </CardHeader>
+        </Card>
       }
     >
       <SigninContent />
     </Suspense>
   )
 }
+
+const signinSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+})
 
 const SigninContent = () => {
   const router = useRouter()
@@ -54,6 +65,14 @@ const SigninContent = () => {
   const supabase = useMemo(() => createClient(), [])
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const form = useForm<z.infer<typeof signinSchema>>({
+    resolver: zodResolver(signinSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
 
   const nextPath = searchParams.get("next") ?? "/"
 
@@ -85,11 +104,27 @@ const SigninContent = () => {
     setErrorMessage(error.message)
   }
 
+  const onSubmit = async (data: z.infer<typeof signinSchema>) => {
+    if (submitting) return
+
+    setSubmitting(true)
+    setErrorMessage(null)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    })
+
+    if (!error) return
+
+    setSubmitting(false)
+    setErrorMessage(error.message)
+  }
+
   if (!authLoading && user) return null
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center py-10">
-      <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
             Iniciar sesión
@@ -98,16 +133,65 @@ const SigninContent = () => {
             Accede con tu cuenta usando inicio de sesión único
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            type="button"
-            className="w-full"
-            disabled={submitting || authLoading}
-            onClick={() => handleSignInWithProvider("google")}
-            aria-label="Continuar con Google"
-          >
-            Continuar con Google
-          </Button>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Correo electrónico</FormLabel>
+                  <FormControl>
+                    <Input placeholder="nombre@ejemplo.com" {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contraseña</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Contraseña" {...field} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={submitting || authLoading}
+            >
+              Iniciar sesión
+            </Button>
+          </form>
+        </Form>
+
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              o
+            </span>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          type="button"
+          className="w-full"
+          disabled={submitting || authLoading}
+          onClick={() => handleSignInWithProvider("google")}
+        >
+          <GoogleIcon className="mr-2 h-4 w-4" />
+          Continuar con Google
+        </Button>
           {errorMessage ? (
             <p
               className="text-sm text-destructive"
@@ -117,16 +201,15 @@ const SigninContent = () => {
               {errorMessage}
             </p>
           ) : null}
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            ¿No tienes una cuenta?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              Crea una
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
-    </div>
+      </CardContent>
+      <CardFooter className="flex justify-center">
+        <p className="text-sm text-muted-foreground">
+          ¿No tienes una cuenta?{" "}
+          <Link href="/signup" className="text-primary hover:underline">
+            Crea una
+          </Link>
+        </p>
+      </CardFooter>
+    </Card>
   )
 }
