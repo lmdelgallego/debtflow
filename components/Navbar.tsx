@@ -1,12 +1,20 @@
+"use client";
 
-import React from 'react'
 import MaxWidthWrapper from './MaxWidthWrapper'
 import Link from 'next/link'
 import { buttonVariants } from './ui/button'
 
-const Navbar = () => {
+import { useAuth } from '@/context/auth-context'
+import { useRouter } from 'next/dist/client/components/navigation'
 
-  const user:any = {}
+const Navbar = () => {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut();
+    router.push("/signin");
+  };
 
   return (
     <nav className="sticky h-14 inset-x-0 top-0 z-30 w-full border-b border-gray-200 bg-white/75 backdrop-blur-lg transition-all">
