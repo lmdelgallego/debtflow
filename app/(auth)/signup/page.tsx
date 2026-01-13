@@ -24,7 +24,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
-import router from "next/router"
 import { useRouter } from "next/navigation"
 
 const formSchema = z.object({
