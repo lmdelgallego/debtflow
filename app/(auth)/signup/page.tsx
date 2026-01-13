@@ -23,6 +23,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
+import router from "next/router"
+import { useRouter } from "next/navigation"
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -41,6 +44,8 @@ const formSchema = z.object({
 })
 
 export default function SignupPage() {
+  const supabase = createClient();
+  const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,9 +56,15 @@ export default function SignupPage() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // Aquí iría la lógica de registro
-    console.log(values)
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+
+    const { error } = await supabase.auth.signUp({
+      email: values.email,
+      password: values.password,
+    });
+    if (error) throw error;
+    alert("Cuenta creada con éxito. Por favor, verifica tu correo electrónico.");
+    router.push("/dashboard");
   }
 
   return (
