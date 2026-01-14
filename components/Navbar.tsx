@@ -21,8 +21,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="sticky h-14 inset-x-0 top-0 z-30 w-full border-b border-gray-200 bg-white/75 backdrop-blur-lg transition-all">
-      <MaxWidthWrapper>
+    <nav className="sticky h-14 inset-x-0 top-0 z-30 w-full border-b px-6 border-gray-200 bg-white/75 backdrop-blur-lg transition-all">
         <div className="flex h-14 items-center justify-between border-b border-zinc-200">
           <Link href="/" className='flex z-40 font-semibold'>DebtFlow</Link>
           <div className='hidden items-center space-x-4 sm:flex'>
@@ -54,14 +53,6 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <Link
-                  href='/dashboard'
-                  className={buttonVariants({
-                    variant: 'ghost',
-                    size: 'sm',
-                  })}>
-                  Dashboard
-                </Link>
                   <Button
                     onClick={handleLogout}
                     className={buttonVariants({
@@ -83,8 +74,7 @@ const Navbar = () => {
               </>
             )}
           </div>
-        </div>
-      </MaxWidthWrapper>
+      </div>
     </nav>
   )
 }
