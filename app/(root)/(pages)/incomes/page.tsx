@@ -16,6 +16,7 @@ import { IncomeFilters } from '@/components/incomes/IncomeFilters';
 import { useToast } from '@/components/ui/Toast';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SummarySkeleton, ChartSkeleton, StatisticsSkeleton, TableSkeleton, LineChartSkeleton } from '@/components/incomes/Skeletons';
+import { PageHeader } from '@/components/PageHeader';
 
 const Incomes = () => {
   const { addToast } = useToast();
@@ -274,13 +275,14 @@ const Incomes = () => {
   };
 
   return (
-    <MaxWidthWrapper>
-      <div className="py-8 space-y-8">
+      <>
         {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Ingresos</h1>
-          <p className="text-muted-foreground">Administra tus ingresos fijos y variables</p>
-        </div>
+        <PageHeader>
+          <PageHeader.Title>Ingresos</PageHeader.Title>
+          <PageHeader.Description>
+            Administra y analiza tus ingresos aquí. Agrega, edita o elimina ingresos, y visualiza estadísticas detalladas para un mejor control financiero.
+          </PageHeader.Description>
+        </PageHeader>
 
         {/* Summary Cards */}
         {loadingCharts ? <SummarySkeleton /> : (
@@ -421,8 +423,7 @@ const Incomes = () => {
           onConfirm={confirmDeleteIncome}
           onCancel={() => setConfirmModal({ isOpen: false, id: null })}
         />
-      </div>
-    </MaxWidthWrapper>
+      </>
   );
 };
 

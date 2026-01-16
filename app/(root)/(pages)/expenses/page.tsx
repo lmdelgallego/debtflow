@@ -1,8 +1,18 @@
-import React from 'react'
+'use client'
+
+import { PageHeader } from "@/components/PageHeader"
 
 const Page = () => {
   return (
-    <div>Page</div>
+    <>
+      {/* Header */}
+      <PageHeader>
+        <PageHeader.Title>Gastos</PageHeader.Title>
+        <PageHeader.Description>
+          Administra y analiza tus gastos aquí. Agrega, edita o elimina gastos, y visualiza estadísticas detalladas para un mejor control financiero.
+        </PageHeader.Description>
+      </PageHeader>
+    </>
   )
 }
 
