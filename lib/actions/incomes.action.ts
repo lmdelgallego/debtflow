@@ -10,6 +10,14 @@ export interface Income {
   created_at: string;
 }
 
+export interface PaginatedIncomes {
+  data: Income[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 interface CreateIncomeInput {
   type: 'fixed' | 'variable';
   amount: number;
@@ -21,9 +29,9 @@ interface UpdateIncomeInput extends CreateIncomeInput {
 }
 
 /**
- * Obtiene todos los ingresos del usuario autenticado
+ * Obtiene todos los ingresos del usuario autenticado (para cálculos y gráficos)
  */
-export async function fetchIncomes(): Promise<{ data: Income[] | null; error: string | null }> {
+export async function fetchAllIncomes(): Promise<{ data: Income[] | null; error: string | null }> {
   try {
     const supabase = await createClient();
 
@@ -43,6 +51,62 @@ export async function fetchIncomes(): Promise<{ data: Income[] | null; error: st
     }
 
     return { data: data || [], error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Obtiene los ingresos paginados del usuario autenticado
+ */
+export async function fetchIncomes(
+  page: number = 1,
+  pageSize: number = 10
+): Promise<{ data: PaginatedIncomes | null; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: 'Usuario no autenticado' };
+    }
+
+    // Obtener total de registros
+    const { count, error: countError } = await supabase
+      .from('incomes')
+      .select('id', { count: 'exact' })
+      .eq('user_id', user.id);
+
+    if (countError) {
+      return { data: null, error: countError.message };
+    }
+
+    const total = count || 0;
+    const totalPages = Math.ceil(total / pageSize);
+    const offset = (page - 1) * pageSize;
+
+    // Obtener datos paginados
+    const { data, error } = await supabase
+      .from('incomes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return {
+      data: {
+        data: data || [],
+        total,
+        page,
+        pageSize,
+        totalPages,
+      },
+      error: null,
+    };
   } catch (error) {
     return { data: null, error: error instanceof Error ? error.message : 'Error desconocido' };
   }

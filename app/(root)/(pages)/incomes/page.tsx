@@ -1,17 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import MaxWidthWrapper from '@/components/MaxWidthWrapper';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Trash2, Plus, Edit2, X, Download } from 'lucide-react';
-import { fetchIncomes, createIncome, updateIncome, deleteIncome } from '@/lib/actions/incomes.action';
+import { Plus, X, Edit2, BarChart, Download, LineChart, PieChart, Trash2 } from 'lucide-react';
+import { fetchIncomes, fetchAllIncomes, createIncome, updateIncome, deleteIncome } from '@/lib/actions/incomes.action';
 import type { Income } from '@/lib/actions/incomes.action';
+import { SummaryCards } from '@/components/incomes/SummaryCards';
+import { IncomeCharts } from '@/components/incomes/IncomeCharts';
+import { Statistics } from '@/components/incomes/Statistics';
+import { IncomeTable } from '@/components/incomes/IncomeTable';
+import { IncomeFilters } from '@/components/incomes/IncomeFilters';
+import { ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Pie, Cell, Line } from 'recharts';
 
 const Incomes = () => {
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [allIncomes, setAllIncomes] = useState<Income[]>([]); // Para gráficos y cálculos globales
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ type: 'fixed', amount: '', description: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,26 +25,40 @@ const Incomes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   // Load incomes on mount
   useEffect(() => {
     loadIncomes();
+    loadAllIncomesForCharts();
   }, []);
 
-  // Fetch incomes
-  const loadIncomes = async () => {
+  // Fetch incomes (para tabla paginada)
+  const loadIncomes = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await fetchIncomes();
-    
+    const { data, error: fetchError } = await fetchIncomes(page, pageSize);
+
     if (fetchError) {
       setError(fetchError);
       console.error('Error fetching incomes:', fetchError);
-    } else {
-      setIncomes(data || []);
+    } else if (data) {
+      setIncomes(data.data || []);
     }
     setLoading(false);
-  };
+  }, [page]);
+
+  // Fetch all incomes (para gráficos, estadísticas y cálculos)
+  const loadAllIncomesForCharts = useCallback(async () => {
+    const { data, error: fetchError } = await fetchAllIncomes();
+
+    if (fetchError) {
+      console.error('Error fetching all incomes:', fetchError);
+    } else {
+      setAllIncomes(data || []);
+    }
+  }, []);
 
   // Add or Update income
   const handleSubmitIncome = async (e: React.FormEvent) => {
@@ -123,7 +143,7 @@ const Incomes = () => {
 
     try {
       const { success, error: deleteError } = await deleteIncome(id);
-      
+
       if (deleteError) {
         setError(deleteError);
         console.error('Error deleting income:', deleteError);
@@ -137,19 +157,19 @@ const Incomes = () => {
     }
   };
 
-  // Filter and search incomes
+  // Filter and search incomes (usa la tabla paginada)
   const filteredIncomes = incomes.filter(income => {
     const matchesType = filterType === 'all' || income.type === filterType;
     const matchesSearch = income.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
     return matchesType && (searchTerm === '' || matchesSearch);
   });
 
-  // Calculate totals (all incomes)
-  const fixedTotal = incomes
+  // Calculate totals (usa todos los ingresos)
+  const fixedTotal = allIncomes
     .filter(i => i.type === 'fixed')
     .reduce((sum, i) => sum + i.amount, 0);
 
-  const variableTotal = incomes
+  const variableTotal = allIncomes
     .filter(i => i.type === 'variable')
     .reduce((sum, i) => sum + i.amount, 0);
 
@@ -176,7 +196,7 @@ const Incomes = () => {
   ];
 
   // Monthly trend data
-  const monthlyData = incomes.reduce((acc, income) => {
+  const monthlyData = allIncomes.reduce((acc, income) => {
     const date = new Date(income.created_at);
     const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
     const existing = acc.find(item => item.month === monthYear);
@@ -199,20 +219,20 @@ const Incomes = () => {
     return acc;
   }, [] as Array<{ month: string; fixed: number; variable: number; total: number }>);
 
-  // Calculate statistics
+  // Calculate statistics (usa todos los ingresos)
   const stats = {
-    averageFixed: fixedTotal > 0 ? fixedTotal / incomes.filter(i => i.type === 'fixed').length : 0,
-    averageVariable: variableTotal > 0 ? variableTotal / incomes.filter(i => i.type === 'variable').length : 0,
-    maxIncome: incomes.length > 0 ? Math.max(...incomes.map(i => i.amount)) : 0,
-    minIncome: incomes.length > 0 ? Math.min(...incomes.map(i => i.amount)) : 0,
-    fixedCount: incomes.filter(i => i.type === 'fixed').length,
-    variableCount: incomes.filter(i => i.type === 'variable').length,
+    averageFixed: fixedTotal > 0 ? fixedTotal / allIncomes.filter(i => i.type === 'fixed').length : 0,
+    averageVariable: variableTotal > 0 ? variableTotal / allIncomes.filter(i => i.type === 'variable').length : 0,
+    maxIncome: allIncomes.length > 0 ? Math.max(...allIncomes.map(i => i.amount)) : 0,
+    minIncome: allIncomes.length > 0 ? Math.min(...allIncomes.map(i => i.amount)) : 0,
+    fixedCount: allIncomes.filter(i => i.type === 'fixed').length,
+    variableCount: allIncomes.filter(i => i.type === 'variable').length,
   };
 
   // Export to CSV
   const handleExportCSV = () => {
     const headers = ['Descripción', 'Tipo', 'Monto', 'Fecha'];
-    const rows = incomes.map(income => [
+    const rows = allIncomes.map(income => [
       income.description || 'Sin descripción',
       income.type === 'fixed' ? 'Fijo' : 'Variable',
       income.amount.toFixed(2),
@@ -254,137 +274,31 @@ const Incomes = () => {
         )}
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-6">
-            <p className="text-sm text-muted-foreground">Ingresos Fijos</p>
-            <p className="text-2xl font-bold text-primary mt-2">${fixedTotal.toFixed(2)}</p>
-          </Card>
-          <Card className="p-6">
-            <p className="text-sm text-muted-foreground">Ingresos Variables</p>
-            <p className="text-2xl font-bold text-accent mt-2">${variableTotal.toFixed(2)}</p>
-          </Card>
-          <Card className="p-6">
-            <p className="text-sm text-muted-foreground">Ingreso Total</p>
-            <p className="text-2xl font-bold text-secondary mt-2">${totalIncome.toFixed(2)}</p>
-          </Card>
-        </div>
+        <SummaryCards
+          fixedTotal={fixedTotal}
+          variableTotal={variableTotal}
+          totalIncome={totalIncome}
+        />
 
         {/* Advanced Charts */}
-        {incomes.length > 0 && (
-          <div className="space-y-6">
-            {/* Bar Chart and Pie Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Comparativa de Ingresos</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
-                    <Legend />
-                    <Bar dataKey="Fixed" fill="oklch(0.62 0.22 280)" name="Fijos" radius={[8, 8, 0, 0]} />
-                    <Bar dataKey="Variable" fill="oklch(0.68 0.22 30)" name="Variables" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Distribución de Ingresos</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={(entry) => `${entry.name}: $${entry.value.toFixed(0)}`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card>
-            </div>
-
-            {/* Line Chart - Monthly Trend */}
-            {monthlyData.length > 0 && (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Tendencia Mensual de Ingresos</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="fixed"
-                      stroke="oklch(0.62 0.22 280)"
-                      name="Fijos"
-                      strokeWidth={2}
-                      dot={{ fill: 'oklch(0.62 0.22 280)', r: 5 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="variable"
-                      stroke="oklch(0.68 0.22 30)"
-                      name="Variables"
-                      strokeWidth={2}
-                      dot={{ fill: 'oklch(0.68 0.22 30)', r: 5 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="total"
-                      stroke="oklch(0.72 0.19 42)"
-                      name="Total"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={{ fill: 'oklch(0.72 0.19 42)', r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Card>
-            )}
+        {allIncomes.length > 0 && (
+          <>
+            <IncomeCharts
+              chartData={chartData}
+              pieData={pieData}
+              monthlyData={monthlyData}
+            />
 
             {/* Statistics */}
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Estadísticas</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Promedio Fijos</p>
-                  <p className="text-lg font-bold text-primary">${stats.averageFixed.toFixed(2)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Promedio Variables</p>
-                  <p className="text-lg font-bold text-accent">${stats.averageVariable.toFixed(2)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Ingreso Máximo</p>
-                  <p className="text-lg font-bold text-secondary">${stats.maxIncome.toFixed(2)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Ingreso Mínimo</p>
-                  <p className="text-lg font-bold">${stats.minIncome.toFixed(2)}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Ingresos Fijos</p>
-                  <p className="text-lg font-bold text-primary">{stats.fixedCount}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Ingresos Variables</p>
-                  <p className="text-lg font-bold text-accent">{stats.variableCount}</p>
-                </div>
-              </div>
-            </Card>
-          </div>
+            <Statistics
+              averageFixed={stats.averageFixed}
+              averageVariable={stats.averageVariable}
+              maxIncome={stats.maxIncome}
+              minIncome={stats.minIncome}
+              fixedCount={stats.fixedCount}
+              variableCount={stats.variableCount}
+            />
+          </>
         )}
 
         {/* Add/Edit Income Form */}
@@ -457,124 +371,25 @@ const Incomes = () => {
         </Card>
 
         {/* Filters and Export */}
-        {incomes.length > 0 && (
-          <Card className="p-6">
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-end justify-between">
-              <div className="w-full md:w-auto space-y-2">
-                <label className="text-sm font-medium">Filtrar por Tipo</label>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as 'all' | 'fixed' | 'variable')}
-                  className="w-full md:w-48 px-3 py-2 border border-border rounded-lg bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="all">Todos</option>
-                  <option value="fixed">Fijos</option>
-                  <option value="variable">Variables</option>
-                </select>
-              </div>
-              <div className="w-full md:w-auto space-y-2">
-                <label className="text-sm font-medium">Buscar por Descripción</label>
-                <Input
-                  type="text"
-                  placeholder="Ej: Sueldo..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full md:w-48"
-                />
-              </div>
-              <Button
-                onClick={handleExportCSV}
-                variant="outline"
-                className="w-full md:w-auto gap-2"
-              >
-                <Download size={18} />
-                Exportar CSV
-              </Button>
-            </div>
-          </Card>
-        )}
+        <IncomeFilters
+          incomes={allIncomes}
+          filterType={filterType}
+          searchTerm={searchTerm}
+          onFilterChange={setFilterType}
+          onSearchChange={setSearchTerm}
+          onExportCSV={handleExportCSV}
+        />
 
         {/* Incomes Table */}
-        <Card className="p-6 overflow-x-auto">
-          <h2 className="text-lg font-semibold mb-4">Listado de Ingresos</h2>
-          {loading ? (
-            <p className="text-center py-8 text-muted-foreground">Cargando...</p>
-          ) : incomes.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">No hay ingresos registrados</p>
-          ) : filteredIncomes.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">No hay ingresos que coincidan con los filtros</p>
-          ) : (
-            <>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-semibold">Descripción</th>
-                    <th className="text-left py-3 px-4 font-semibold">Tipo</th>
-                    <th className="text-right py-3 px-4 font-semibold">Monto</th>
-                    <th className="text-left py-3 px-4 font-semibold">Fecha</th>
-                    <th className="text-center py-3 px-4 font-semibold">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredIncomes.map((income) => (
-                    <tr key={income.id} className="border-b border-border hover:bg-muted/50 transition">
-                      <td className="py-3 px-4">{income.description || 'Sin descripción'}</td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                            income.type === 'fixed'
-                              ? 'bg-primary/20 text-primary'
-                              : 'bg-accent/20 text-accent'
-                          }`}
-                        >
-                          {income.type === 'fixed' ? 'Fijo' : 'Variable'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold">${income.amount.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-muted-foreground text-xs">
-                        {new Date(income.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => startEdit(income)}
-                            className="text-primary hover:bg-primary/20 p-2 rounded transition"
-                            title="Editar"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteIncome(income.id)}
-                            className="text-destructive hover:bg-destructive/20 p-2 rounded transition"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-4 pt-4 border-t border-border text-sm">
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-muted-foreground">Fijos (filtrados)</p>
-                    <p className="font-semibold">${filteredFixedTotal.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Variables (filtrados)</p>
-                    <p className="font-semibold">${filteredVariableTotal.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Total (filtrados)</p>
-                    <p className="font-semibold">${(filteredFixedTotal + filteredVariableTotal).toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </Card>
+        <IncomeTable
+          incomes={incomes}
+          loading={loading}
+          filteredIncomes={filteredIncomes}
+          filteredFixedTotal={filteredFixedTotal}
+          filteredVariableTotal={filteredVariableTotal}
+          onEdit={startEdit}
+          onDelete={handleDeleteIncome}
+        />
       </div>
     </MaxWidthWrapper>
   );
