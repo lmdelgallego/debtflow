@@ -1,111 +1,102 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import MaxWidthWrapper from '@/components/MaxWidthWrapper';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Trash2, Plus, Edit2, X, Download } from 'lucide-react';
-
-interface Income {
-  id: string;
-  type: 'fixed' | 'variable';
-  amount: number;
-  description?: string;
-  created_at: string;
-}
+import { fetchIncomes, createIncome, updateIncome, deleteIncome } from '@/lib/actions/incomes.action';
+import type { Income } from '@/lib/actions/incomes.action';
 
 const Incomes = () => {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({ type: 'fixed', amount: '', description: '' });
-  const [userId, setUserId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'fixed' | 'variable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const supabase = createClient();
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Get current user
+  // Load incomes on mount
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-        fetchIncomes(user.id);
-      }
-    };
-    getUser();
+    loadIncomes();
   }, []);
 
   // Fetch incomes
-  const fetchIncomes = async (uid: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('incomes')
-        .select('*')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+  const loadIncomes = async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: fetchError } = await fetchIncomes();
+    
+    if (fetchError) {
+      setError(fetchError);
+      console.error('Error fetching incomes:', fetchError);
+    } else {
       setIncomes(data || []);
-    } catch (error) {
-      console.error('Error fetching incomes:', error);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   // Add or Update income
   const handleSubmitIncome = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId || !formData.amount) return;
+    if (!formData.amount) return;
+
+    setSubmitting(true);
+    setError(null);
 
     try {
+      const amount = parseFloat(formData.amount);
+
       if (editingId) {
         // Update
-        const { error } = await supabase
-          .from('incomes')
-          .update({
-            type: formData.type,
-            amount: parseFloat(formData.amount),
-            description: formData.description || null,
-          })
-          .eq('id', editingId);
+        const { data, error: updateError } = await updateIncome({
+          id: editingId,
+          type: formData.type as 'fixed' | 'variable',
+          amount,
+          description: formData.description || undefined,
+        });
 
-        if (error) throw error;
-        setIncomes(incomes.map(income =>
-          income.id === editingId
-            ? {
-                ...income,
-                type: formData.type as 'fixed' | 'variable',
-                amount: parseFloat(formData.amount),
-                description: formData.description || undefined,
-              }
-            : income
-        ));
-        setEditingId(null);
+        if (updateError) {
+          setError(updateError);
+          console.error('Error updating income:', updateError);
+        } else if (data) {
+          setIncomes(incomes.map(income =>
+            income.id === editingId
+              ? {
+                  ...data,
+                  description: data.description || undefined,
+                }
+              : income
+          ));
+          setEditingId(null);
+          setFormData({ type: 'fixed', amount: '', description: '' });
+        }
       } else {
-        // Insert
-        const { data, error } = await supabase
-          .from('incomes')
-          .insert([
-            {
-              user_id: userId,
-              type: formData.type,
-              amount: parseFloat(formData.amount),
-              description: formData.description || null,
-            },
-          ])
-          .select();
+        // Create
+        const { data, error: createError } = await createIncome({
+          type: formData.type as 'fixed' | 'variable',
+          amount,
+          description: formData.description || undefined,
+        });
 
-        if (error) throw error;
-        setIncomes([...(data || []), ...incomes]);
+        if (createError) {
+          setError(createError);
+          console.error('Error creating income:', createError);
+        } else if (data) {
+          setIncomes([data, ...incomes]);
+          setFormData({ type: 'fixed', amount: '', description: '' });
+        }
       }
-      setFormData({ type: 'fixed', amount: '', description: '' });
-    } catch (error) {
-      console.error('Error submitting income:', error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      setError(message);
+      console.error('Error submitting income:', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -117,6 +108,7 @@ const Incomes = () => {
       description: income.description || '',
     });
     setEditingId(income.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Cancel editing
@@ -127,16 +119,21 @@ const Incomes = () => {
 
   // Delete income
   const handleDeleteIncome = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('incomes')
-        .delete()
-        .eq('id', id);
+    if (!confirm('¿Estás seguro de que deseas eliminar este ingreso?')) return;
 
-      if (error) throw error;
-      setIncomes(incomes.filter(income => income.id !== id));
-    } catch (error) {
-      console.error('Error deleting income:', error);
+    try {
+      const { success, error: deleteError } = await deleteIncome(id);
+      
+      if (deleteError) {
+        setError(deleteError);
+        console.error('Error deleting income:', deleteError);
+      } else if (success) {
+        setIncomes(incomes.filter(income => income.id !== id));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      setError(message);
+      console.error('Error deleting income:', err);
     }
   };
 
@@ -226,13 +223,11 @@ const Incomes = () => {
       headers.join(','),
       ...rows.map(row => row.map(cell => `"${cell}"`).join(',')),
       '',
-      ['RESUMEN', '', '', ''],
-      ['Ingresos Fijos', '', fixedTotal.toFixed(2), ''],
-      ['Ingresos Variables', '', variableTotal.toFixed(2), ''],
-      ['Ingreso Total', '', totalIncome.toFixed(2), ''],
-    ]
-      .map(row => row.join(','))
-      .join('\n');
+      ['RESUMEN', '', '', ''].join(','),
+      ['Ingresos Fijos', '', fixedTotal.toFixed(2), ''].join(','),
+      ['Ingresos Variables', '', variableTotal.toFixed(2), ''].join(','),
+      ['Ingreso Total', '', totalIncome.toFixed(2), ''].join(','),
+    ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -250,6 +245,13 @@ const Incomes = () => {
           <h1 className="text-3xl font-bold">Ingresos</h1>
           <p className="text-muted-foreground">Administra tus ingresos fijos y variables</p>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <Card className="p-4 bg-red-50 border-red-200">
+            <p className="text-red-800">{error}</p>
+          </Card>
+        )}
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -279,7 +281,7 @@ const Incomes = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="name" />
                     <YAxis />
-                    <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
+                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
                     <Legend />
                     <Bar dataKey="Fixed" fill="oklch(0.62 0.22 280)" name="Fijos" radius={[8, 8, 0, 0]} />
                     <Bar dataKey="Variable" fill="oklch(0.68 0.22 30)" name="Variables" radius={[8, 8, 0, 0]} />
@@ -305,7 +307,7 @@ const Incomes = () => {
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
+                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
                   </PieChart>
                 </ResponsiveContainer>
               </Card>
@@ -320,7 +322,7 @@ const Incomes = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
+                    <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
                     <Legend />
                     <Line
                       type="monotone"
@@ -425,16 +427,16 @@ const Incomes = () => {
               />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" className="flex-1 gap-2">
+              <Button type="submit" className="flex-1 gap-2" disabled={submitting}>
                 {editingId ? (
                   <>
                     <Edit2 size={18} />
-                    Guardar Cambios
+                    {submitting ? 'Guardando...' : 'Guardar Cambios'}
                   </>
                 ) : (
                   <>
                     <Plus size={18} />
-                    Agregar Ingreso
+                    {submitting ? 'Agregando...' : 'Agregar Ingreso'}
                   </>
                 )}
               </Button>
@@ -444,6 +446,7 @@ const Incomes = () => {
                   variant="outline"
                   onClick={cancelEdit}
                   className="gap-2"
+                  disabled={submitting}
                 >
                   <X size={18} />
                   Cancelar

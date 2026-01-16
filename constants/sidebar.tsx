@@ -4,7 +4,7 @@ import { CreditCard, DollarSign, HandCoins, LayoutDashboard } from "lucide-react
 export const sidebarLinks: SidebarLink[] = [
   {
     title: 'Dashboard',
-    route: '/',
+    route: '/dashboard',
     icon: <LayoutDashboard />,
   },
   {
