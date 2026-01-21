@@ -28,7 +28,7 @@ export function IncomeCharts({
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
+              <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
               <Legend />
               <Bar dataKey="Fixed" fill="oklch(0.62 0.22 280)" name="Fijos" radius={[8, 8, 0, 0]} />
               <Bar dataKey="Variable" fill="oklch(0.68 0.22 30)" name="Variables" radius={[8, 8, 0, 0]} />
@@ -45,7 +45,7 @@ export function IncomeCharts({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={(entry) => `${entry.name}: $${entry.value.toFixed(0)}`}
+                label={(entry) => `${entry.name}: $${entry.value.toLocaleString()}`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -54,7 +54,7 @@ export function IncomeCharts({
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `$${(value as number).toFixed(2)}`} />
+              <Tooltip formatter={(value) => `$${(value as number).toLocaleString()}`} />
             </PieChart>
           </ResponsiveContainer>
         </Card>

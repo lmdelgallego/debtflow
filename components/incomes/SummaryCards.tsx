@@ -15,15 +15,15 @@ export function SummaryCards({
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Card className="p-6">
         <p className="text-sm text-muted-foreground">Ingresos Fijos</p>
-        <p className="text-2xl font-bold text-primary mt-2">${fixedTotal.toFixed(2)}</p>
+        <p className="text-2xl font-bold text-primary mt-2">${fixedTotal.toLocaleString()}</p>
       </Card>
       <Card className="p-6">
         <p className="text-sm text-muted-foreground">Ingresos Variables</p>
-        <p className="text-2xl font-bold text-accent mt-2">${variableTotal.toFixed(2)}</p>
+        <p className="text-2xl font-bold text-accent mt-2">${variableTotal.toLocaleString()}</p>
       </Card>
       <Card className="p-6">
         <p className="text-sm text-muted-foreground">Ingreso Total</p>
-        <p className="text-2xl font-bold text-secondary mt-2">${totalIncome.toFixed(2)}</p>
+        <p className="text-2xl font-bold text-secondary mt-2">${totalIncome.toLocaleString()}</p>
       </Card>
     </div>
   );

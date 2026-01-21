@@ -56,7 +56,7 @@ export function IncomeTable({
                       {income.type === 'fixed' ? 'Fijo' : 'Variable'}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right font-semibold">${income.amount.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-right font-semibold">${income.amount.toLocaleString()}</td>
                   <td className="py-3 px-4 text-muted-foreground text-xs">
                     {new Date(income.created_at).toLocaleDateString()}
                   </td>
@@ -90,15 +90,15 @@ export function IncomeTable({
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-muted-foreground">Fijos (filtrados)</p>
-                <p className="font-semibold">${filteredFixedTotal.toFixed(2)}</p>
+                <p className="font-semibold">${filteredFixedTotal.toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Variables (filtrados)</p>
-                <p className="font-semibold">${filteredVariableTotal.toFixed(2)}</p>
+                <p className="font-semibold">${filteredVariableTotal.toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Total (filtrados)</p>
-                <p className="font-semibold">${(filteredFixedTotal + filteredVariableTotal).toFixed(2)}</p>
+                <p className="font-semibold">${(filteredFixedTotal + filteredVariableTotal).toLocaleString()}</p>
               </div>
             </div>
           </div>
