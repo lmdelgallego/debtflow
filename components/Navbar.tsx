@@ -7,6 +7,8 @@ import { Button, buttonVariants } from './ui/button'
 import { useAuth } from '@/context/auth-context'
 import { useRouter } from 'next/dist/client/components/navigation'
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
 const Navbar = () => {
   const { user, signOut } = useAuth();
   const router = useRouter();
@@ -52,7 +54,12 @@ const Navbar = () => {
                 </RegisterLink> */}
               </>
             ) : (
-              <>
+              <div className='flex gap-3'>
+
+                  <Avatar>
+                    <AvatarImage src="https://github.com/shadcn.png" />
+                    <AvatarFallback>CN</AvatarFallback>
+                  </Avatar>
                   <Button
                     onClick={handleLogout}
                     className={buttonVariants({
@@ -71,7 +78,7 @@ const Navbar = () => {
                   email={user.email ?? ''}
                   imageUrl={user.picture ?? ''}
                 /> */}
-              </>
+              </div>
             )}
           </div>
       </div>
