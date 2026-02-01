@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button";
+import NewExpense from "@/components/expenses/new-expense";
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f97316', '#ec4899'];
 
@@ -155,10 +156,10 @@ const Page = () => {
         <div className="flex flex-col gap-6 max-sm:col-span-2">
           <h3 className="text-xl font-semibold">Top 3 Categorías</h3>
           {top3ExpensesData.map((expense, index) => (
-            <div
+            <Card
                 key={expense.id}
-                className="bg-white rounded-lg shadow-md p-6 border border-gray-200"
-              >
+            >
+              <CardContent>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-medium text-gray-700">#{index + 1} </span>
                   <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: expense.category?.color }}></div>
@@ -166,7 +167,8 @@ const Page = () => {
                 </div>
                 <p className="text-3xl font-bold text-red-600">${expense.value.toLocaleString()}</p>
                 <p className="text-sm text-gray-500 mt-1">{expense.percentage}% of total</p>
-              </div>
+                </CardContent>
+            </Card>
             ))}
 
         </div>
@@ -196,6 +198,10 @@ const Page = () => {
 
         <Card className="col-span-2">
           <CardContent>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Historial de Gastos</h3>
+              <NewExpense />
+            </div>
             <Table>
               <TableCaption>A list of recent invoices.</TableCaption>
               <TableBody>

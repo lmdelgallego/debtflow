@@ -8,7 +8,7 @@ import {
 
 const Sidebar = () => {
   return (
-    <section className=" sticky left-0 top-0 flex h-screen w-fit flex-col justify-between  overflow-y-auto border rounded-3xl p-6 shadow-light-300 dark:shadow-none  max-sm:hidden ">
+    <section className=" sticky left-0 top-0 flex h-screen w-fit flex-col justify-between  overflow-y-auto p-6 shadow-light-300 dark:shadow-none  max-sm:hidden ">
       <div className='flex flex-1 flex-col gap-6'>
         {sidebarLinks.map((item) => {
           return (
