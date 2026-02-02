@@ -27,10 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="relative min-h-full">
       <body
         className={cn(
-          "min-h-screen font-sans antialiased grainy",
+          "overflow-hidden bg-background font-sans antialiased grainy",
           geistSans.variable,
           geistMono.variable,
           "antialiased"
