@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Check, AlertCircle, Info } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -25,6 +25,10 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   const addToast = useCallback((message: string, type: ToastType, duration = 4000) => {
     const id = Math.random().toString(36).substring(7);
     const toast: Toast = { id, message, type, duration };
@@ -36,11 +40,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         removeToast(id);
       }, duration);
     }
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
+  }, [removeToast]);
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
@@ -113,8 +113,10 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       {getIcon()}
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
       <button
+        aria-label="Cerrar notificación"
         onClick={handleClose}
         className="text-current opacity-70 hover:opacity-100 transition-opacity flex-shrink-0"
+        type="button"
       >
         <X size={18} />
       </button>

@@ -33,12 +33,6 @@ const Incomes = () => {
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
   const pageSize = 10;
 
-  // Load incomes on mount
-  useEffect(() => {
-    loadIncomes();
-    loadAllIncomesForCharts();
-  }, []);
-
   // Fetch incomes (para tabla paginada)
   const loadIncomes = useCallback(async () => {
     setLoading(true);
@@ -51,7 +45,7 @@ const Incomes = () => {
       setIncomes(data.data || []);
     }
     setLoading(false);
-  }, [page, addToast]);
+  }, [addToast, page, pageSize]);
 
   // Fetch all incomes (para gráficos, estadísticas y cálculos)
   const loadAllIncomesForCharts = useCallback(async () => {
@@ -65,6 +59,14 @@ const Incomes = () => {
     }
     setLoadingCharts(false);
   }, []);
+
+  useEffect(() => {
+    loadIncomes();
+  }, [loadIncomes]);
+
+  useEffect(() => {
+    loadAllIncomesForCharts();
+  }, [loadAllIncomesForCharts]);
 
   // Add or Update income
   const handleSubmitIncome = async (e: React.FormEvent) => {
