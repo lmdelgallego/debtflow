@@ -1,7 +1,9 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
 interface SummaryCardProps {
@@ -13,6 +15,11 @@ interface SummaryCardProps {
   sparklineData?: number[];
   sparklineColor?: string;
   index?: number;
+  size?: 'default' | 'hero';
+  /** If provided, shows a positive/negative trend indicator */
+  trend?: 'positive' | 'negative' | 'neutral';
+  /** Small descriptive note below the value */
+  hint?: string;
 }
 
 export function SummaryCard({
@@ -24,31 +31,61 @@ export function SummaryCard({
   sparklineData,
   sparklineColor = 'oklch(0.65 0.15 250)',
   index = 0,
+  size = 'default',
+  trend,
+  hint,
 }: SummaryCardProps) {
   const chartData = sparklineData?.map((v) => ({ value: v })) || [];
 
+  const isHero = size === 'hero';
+
+  const TrendIcon = trend === 'positive' ? TrendingUp : TrendingDown;
+  const trendColor =
+    trend === 'positive' ? 'text-income' : trend === 'negative' ? 'text-expense' : 'text-muted-foreground';
+
   return (
-    <Card className={`p-5 border-t-2 ${accentClass} card-hover animate-fade-in-up stagger-${index + 1}`}>
+    <Card
+      className={cn(
+        `border-t-2 ${accentClass} card-hover animate-fade-in-up stagger-${index + 1}`,
+        isHero ? 'p-6' : 'p-5',
+      )}
+    >
       <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-semibold font-mono animate-count-up">
+        <div className={cn('space-y-1', isHero ? 'space-y-2' : '')}>
+          <p className={cn('text-muted-foreground', isHero ? 'text-sm font-medium uppercase tracking-wider' : 'text-sm')}>
+            {label}
+          </p>
+          <p
+            className={cn(
+              'font-semibold font-mono animate-count-up',
+              isHero ? 'text-4xl' : 'text-2xl',
+              trend === 'positive' && 'text-income',
+              trend === 'negative' && 'text-expense',
+            )}
+          >
             ${value.toLocaleString()}
           </p>
+          {trend && trend !== 'neutral' && (
+            <div className={cn('flex items-center gap-1.5 text-xs font-medium', trendColor)}>
+              <TrendIcon size={12} />
+              <span>{trend === 'positive' ? 'Flujo positivo' : 'Flujo negativo'}</span>
+            </div>
+          )}
+          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBg}`}>
-          <Icon size={20} />
+        <div className={cn('flex shrink-0 items-center justify-center rounded-lg', iconBg, isHero ? 'h-12 w-12' : 'h-10 w-10')}>
+          <Icon size={isHero ? 22 : 20} />
         </div>
       </div>
       {chartData.length > 1 && (
-        <div className="mt-3 h-10">
+        <div className={cn('mt-3', isHero ? 'h-14' : 'h-10')}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <Line
                 type="monotone"
                 dataKey="value"
                 stroke={sparklineColor}
-                strokeWidth={1.5}
+                strokeWidth={isHero ? 2 : 1.5}
                 dot={false}
               />
             </LineChart>
