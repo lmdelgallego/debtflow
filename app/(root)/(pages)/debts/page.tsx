@@ -13,6 +13,7 @@ import { fetchAllExpenses } from '@/lib/actions/expenses.action';
 import { DebtDialog } from '@/components/debts/DebtDialog';
 import { DebtSummaryCards } from '@/components/debts/DebtSummaryCards';
 import { DebtTargetCard } from '@/components/debts/DebtTargetCard';
+import { MethodComparisonCard } from '@/components/debts/MethodComparisonCard';
 import { DebtTable } from '@/components/debts/DebtTable';
 import { useToast } from '@/components/ui/Toast';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -170,6 +171,15 @@ const Debts = () => {
       {/* Target Card — Próxima deuda a atacar */}
       {!loadingAll && activeDebts.length > 0 && (
         <DebtTargetCard
+          debts={allDebts}
+          totalIncome={totalIncome}
+          totalExpenses={totalExpenses}
+        />
+      )}
+
+      {/* Method Comparison */}
+      {!loadingAll && activeDebts.length > 0 && (
+        <MethodComparisonCard
           debts={allDebts}
           totalIncome={totalIncome}
           totalExpenses={totalExpenses}
