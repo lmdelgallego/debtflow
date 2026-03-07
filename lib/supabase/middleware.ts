@@ -5,6 +5,9 @@ import { type NextRequest, NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
+const PUBLIC_PATHS = new Set(["/", "/signin", "/signup", "/auth/callback"]);
+const PRIVATE_PREFIXES = ["/dashboard", "/incomes", "/expenses", "/instruments", "/debts"];
+
 export async function updateSession(request: NextRequest) {
   // Create an unmodified response
   let supabaseResponse = NextResponse.next({
@@ -36,16 +39,24 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if(request.nextUrl.pathname == '/signin' && user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
-    }
-    if(request.nextUrl.pathname === '/dashboard' && !user) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/signin'
-      return NextResponse.redirect(url)
-    }
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath = PUBLIC_PATHS.has(pathname);
+  const isPrivatePath = PRIVATE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  if (isPublicPath && user && (pathname === "/signin" || pathname === "/signup")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (isPrivatePath && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/signin";
+    url.search = "";
+    url.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse
 };

@@ -5,21 +5,25 @@ export const sidebarLinks: SidebarLink[] = [
   {
     title: 'Dashboard',
     route: '/dashboard',
-    icon: <LayoutDashboard />,
+    icon: <LayoutDashboard size={20} />,
+    color: 'primary',
   },
   {
     title: 'Ingresos',
     route: '/incomes',
-    icon: <DollarSign />,
+    icon: <DollarSign size={20} />,
+    color: 'income',
   },
   {
     title: 'Gastos',
     route: '/expenses',
-    icon: <CreditCard />,
+    icon: <CreditCard size={20} />,
+    color: 'expense',
   },
   {
     title: 'Deudas',
     route: '/debts',
-    icon: <HandCoins />,
+    icon: <HandCoins size={20} />,
+    color: 'debt',
   },
 ];

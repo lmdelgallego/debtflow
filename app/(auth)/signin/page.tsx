@@ -114,13 +114,14 @@ const SigninContent = () => {
       email: data.email,
       password: data.password,
     })
+
+    if (error) {
+      setSubmitting(false)
+      setErrorMessage(error.message)
+      return
+    }
+
     router.replace(nextPath)
-
-    if (!error) return
-
-
-    setSubmitting(false)
-    setErrorMessage(error.message)
   }
 
   if (!authLoading && user) return null
@@ -145,8 +146,9 @@ const SigninContent = () => {
                 <FormItem>
                   <FormLabel>Correo electrónico</FormLabel>
                   <FormControl>
-                    <Input placeholder="nombre@ejemplo.com" {...field} />
+                    <Input autoComplete="email" placeholder="nombre@ejemplo.com" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -157,8 +159,9 @@ const SigninContent = () => {
                 <FormItem>
                   <FormLabel>Contraseña</FormLabel>
                   <FormControl>
-                    <Input placeholder="Contraseña" {...field} />
+                    <Input autoComplete="current-password" placeholder="Contraseña" type="password" {...field} />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />

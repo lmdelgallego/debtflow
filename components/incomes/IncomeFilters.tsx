@@ -31,7 +31,7 @@ export function IncomeFilters({
           <select
             value={filterType}
             onChange={(e) => onFilterChange(e.target.value as 'all' | 'fixed' | 'variable')}
-            className="w-full md:w-48 px-3 py-2 border border-border rounded-lg bg-input focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full md:w-48 px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="all">Todos</option>
             <option value="fixed">Fijos</option>

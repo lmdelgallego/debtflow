@@ -1,17 +1,22 @@
+'use client';
+
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import { SidebarProvider } from "@/context/sidebar-context";
 
 function Layout({ children }: { children: React.ReactNode}) {
   return (
-    <main className="relative">
-      <Navbar />
-      <div className="flex overflow-hidden h-screen p-6 gap-4">
+    <SidebarProvider>
+      <div className="flex h-screen overflow-hidden">
         <Sidebar />
-        <section className='w-full'>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Navbar />
+          <main className="flex-1 overflow-y-auto animate-in fade-in duration-300">
             {children}
-        </section>
+          </main>
+        </div>
       </div>
-    </main>
+    </SidebarProvider>
   )
 }
 
