@@ -6,7 +6,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const PUBLIC_PATHS = new Set(["/", "/signin", "/signup", "/auth/callback"]);
-const PRIVATE_PREFIXES = ["/dashboard", "/incomes", "/expenses", "/instruments"];
+const PRIVATE_PREFIXES = ["/dashboard", "/incomes", "/expenses", "/instruments", "/debts"];
 
 export async function updateSession(request: NextRequest) {
   // Create an unmodified response

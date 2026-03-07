@@ -70,34 +70,45 @@ function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast:
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const [isClosing, setIsClosing] = useState(false);
+  const duration = toast.duration || 4000;
+
+  const getProgressColor = () => {
+    switch (toast.type) {
+      case 'success': return 'bg-income';
+      case 'error': return 'bg-debt';
+      case 'warning': return 'bg-expense';
+      case 'info':
+      default: return 'bg-primary';
+    }
+  };
 
   const getStyles = () => {
-    const baseStyles = 'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-5 duration-200';
+    const baseStyles = 'flex flex-col rounded-lg border animate-in slide-in-from-right-5 duration-200 bg-card overflow-hidden';
 
     switch (toast.type) {
       case 'success':
-        return `${baseStyles} bg-green-50 border-green-200 text-green-800`;
+        return `${baseStyles} border-income/30 text-income`;
       case 'error':
-        return `${baseStyles} bg-red-50 border-red-200 text-red-800`;
+        return `${baseStyles} border-debt/30 text-debt`;
       case 'warning':
-        return `${baseStyles} bg-yellow-50 border-yellow-200 text-yellow-800`;
+        return `${baseStyles} border-expense/30 text-expense`;
       case 'info':
       default:
-        return `${baseStyles} bg-blue-50 border-blue-200 text-blue-800`;
+        return `${baseStyles} border-primary/30 text-primary`;
     }
   };
 
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <Check size={20} className="text-green-600 flex-shrink-0" />;
+        return <Check size={20} className="text-income flex-shrink-0" />;
       case 'error':
-        return <AlertCircle size={20} className="text-red-600 flex-shrink-0" />;
+        return <AlertCircle size={20} className="text-debt flex-shrink-0" />;
       case 'warning':
-        return <AlertCircle size={20} className="text-yellow-600 flex-shrink-0" />;
+        return <AlertCircle size={20} className="text-expense flex-shrink-0" />;
       case 'info':
       default:
-        return <Info size={20} className="text-blue-600 flex-shrink-0" />;
+        return <Info size={20} className="text-primary flex-shrink-0" />;
     }
   };
 
@@ -110,16 +121,28 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     <div
       className={`${getStyles()} ${isClosing ? 'animate-out slide-out-to-right-5 duration-150' : ''}`}
     >
-      {getIcon()}
-      <p className="flex-1 text-sm font-medium">{toast.message}</p>
-      <button
-        aria-label="Cerrar notificación"
-        onClick={handleClose}
-        className="text-current opacity-70 hover:opacity-100 transition-opacity flex-shrink-0"
-        type="button"
-      >
-        <X size={18} />
-      </button>
+      <div className="flex items-center gap-3 px-4 py-3">
+        {getIcon()}
+        <p className="flex-1 text-sm font-medium text-foreground">{toast.message}</p>
+        <button
+          aria-label="Cerrar notificación"
+          onClick={handleClose}
+          className="text-muted-foreground hover:text-foreground transition-opacity flex-shrink-0"
+          type="button"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      {duration > 0 && (
+        <div className="h-0.5 w-full bg-muted/30">
+          <div
+            className={`h-full ${getProgressColor()} origin-left`}
+            style={{
+              animation: `toast-progress ${duration}ms linear forwards`,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

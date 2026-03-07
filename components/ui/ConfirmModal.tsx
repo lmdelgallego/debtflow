@@ -40,12 +40,12 @@ export function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
         <div className="flex gap-3">
           {isDangerous && (
             <div className="flex-shrink-0">
-              <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+              <AlertCircle className="w-6 h-6 text-destructive mt-0.5" />
             </div>
           )}
           <div className="flex-1 min-w-0">
@@ -72,7 +72,7 @@ export function ConfirmModal({
           <Button
             onClick={handleConfirm}
             disabled={isProcessing}
-            className={isDangerous ? 'bg-red-600 hover:bg-red-700' : ''}
+            variant={isDangerous ? 'destructive' : 'default'}
           >
             {isProcessing ? 'Procesando...' : confirmText}
           </Button>

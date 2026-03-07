@@ -9,20 +9,20 @@ type PageHeaderCompoundComponent = ((props: PageHeaderProps) => React.JSX.Elemen
 
 const PageHeader = (({ children }: PageHeaderProps) => {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {children}
     </div>
   );
 }) as PageHeaderCompoundComponent;
 
 const PageHeaderTitle = ({ children }: { children: React.ReactNode }) => (
-  <h1 className="text-3xl font-bold">{children}</h1>
+  <h1 className="text-2xl font-semibold tracking-tight">{children}</h1>
 );
 
 PageHeaderTitle.displayName = "PageHeader.Title";
 
 const PageHeaderDescription = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-muted-foreground">{children}</p>
+  <p className="text-sm text-muted-foreground">{children}</p>
 );
 
 PageHeaderDescription.displayName = "PageHeader.Description";

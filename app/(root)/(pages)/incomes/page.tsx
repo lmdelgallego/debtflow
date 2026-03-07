@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import MaxWidthWrapper from '@/components/MaxWidthWrapper';
-import { Plus, X, Edit2 } from 'lucide-react';
-import { fetchIncomes, fetchAllIncomes, createIncome, updateIncome, deleteIncome } from '@/lib/actions/incomes.action';
+import { Plus } from 'lucide-react';
+import { fetchIncomes, fetchAllIncomes, deleteIncome } from '@/lib/actions/incomes.action';
 import type { Income } from '@/lib/actions/incomes.action';
+import { IncomeDialog } from '@/components/incomes/IncomeDialog';
 import { SummaryCards } from '@/components/incomes/SummaryCards';
 import { IncomeCharts } from '@/components/incomes/IncomeCharts';
 import { Statistics } from '@/components/incomes/Statistics';
@@ -24,11 +22,10 @@ const Incomes = () => {
   const [allIncomes, setAllIncomes] = useState<Income[]>([]); // Para gráficos y cálculos globales
   const [loading, setLoading] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
-  const [formData, setFormData] = useState({ type: 'fixed', amount: '', description: '' });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'fixed' | 'variable'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
   const pageSize = 10;
@@ -68,84 +65,22 @@ const Incomes = () => {
     loadAllIncomesForCharts();
   }, [loadAllIncomesForCharts]);
 
-  // Add or Update income
-  const handleSubmitIncome = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.amount) return;
-
-    setSubmitting(true);
-
-    try {
-      const amount = parseFloat(formData.amount);
-
-      if (editingId) {
-        // Update
-        const { data, error: updateError } = await updateIncome({
-          id: editingId,
-          type: formData.type as 'fixed' | 'variable',
-          amount,
-          description: formData.description || undefined,
-        });
-
-        if (updateError) {
-          addToast(updateError, 'error');
-          console.error('Error updating income:', updateError);
-        } else if (data) {
-          setIncomes(incomes.map(income =>
-            income.id === editingId
-              ? {
-                  ...data,
-                  description: data.description || undefined,
-                }
-              : income
-          ));
-          addToast('Ingreso actualizado correctamente', 'success');
-          setEditingId(null);
-          setFormData({ type: 'fixed', amount: '', description: '' });
-          loadAllIncomesForCharts();
-        }
-      } else {
-        // Create
-        const { data, error: createError } = await createIncome({
-          type: formData.type as 'fixed' | 'variable',
-          amount,
-          description: formData.description || undefined,
-        });
-
-        if (createError) {
-          addToast(createError, 'error');
-          console.error('Error creating income:', createError);
-        } else if (data) {
-          setIncomes([data, ...incomes]);
-          addToast('Ingreso creado correctamente', 'success');
-          setFormData({ type: 'fixed', amount: '', description: '' });
-          loadAllIncomesForCharts();
-        }
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido';
-      addToast(message, 'error');
-      console.error('Error submitting income:', err);
-    } finally {
-      setSubmitting(false);
-    }
+  // Open dialog for creating
+  const openCreateDialog = () => {
+    setEditingIncome(null);
+    setDialogOpen(true);
   };
 
-  // Start editing
-  const startEdit = (income: Income) => {
-    setFormData({
-      type: income.type,
-      amount: income.amount.toString(),
-      description: income.description || '',
-    });
-    setEditingId(income.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Open dialog for editing
+  const openEditDialog = (income: Income) => {
+    setEditingIncome(income);
+    setDialogOpen(true);
   };
 
-  // Cancel editing
-  const cancelEdit = () => {
-    setEditingId(null);
-    setFormData({ type: 'fixed', amount: '', description: '' });
+  // Callback when dialog succeeds
+  const handleDialogSuccess = () => {
+    loadIncomes();
+    loadAllIncomesForCharts();
   };
 
   // Delete income
@@ -280,7 +215,14 @@ const Incomes = () => {
       <>
         {/* Header */}
         <PageHeader>
-          <PageHeader.Title>Ingresos</PageHeader.Title>
+          <PageHeader.Title>
+            <div className="flex items-center justify-between gap-2">
+              Ingresos
+              <Button onClick={openCreateDialog}>
+                <Plus size={16} />Agregar Ingreso
+              </Button>
+            </div>
+          </PageHeader.Title>
           <PageHeader.Description>
             Administra y analiza tus ingresos aquí. Agrega, edita o elimina ingresos, y visualiza estadísticas detalladas para un mejor control financiero.
           </PageHeader.Description>
@@ -322,75 +264,6 @@ const Incomes = () => {
           </>
         ) : null}
 
-        {/* Add/Edit Income Form */}
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">
-            {editingId ? 'Editar Ingreso' : 'Agregar Ingreso'}
-          </h2>
-          <form onSubmit={handleSubmitIncome} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'fixed' | 'variable' })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-input focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="fixed">Fijo</option>
-                  <option value="variable">Variable</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Monto</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción (opcional)</label>
-              <Input
-                type="text"
-                placeholder="Ej: Sueldo, Freelance, etc."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" className="flex-1 gap-2" disabled={submitting}>
-                {editingId ? (
-                  <>
-                    <Edit2 size={18} />
-                    {submitting ? 'Guardando...' : 'Guardar Cambios'}
-                  </>
-                ) : (
-                  <>
-                    <Plus size={18} />
-                    {submitting ? 'Agregando...' : 'Agregar Ingreso'}
-                  </>
-                )}
-              </Button>
-              {editingId && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={cancelEdit}
-                  className="gap-2"
-                  disabled={submitting}
-                >
-                  <X size={18} />
-                  Cancelar
-                </Button>
-              )}
-            </div>
-          </form>
-        </Card>
-
         {/* Filters and Export */}
         <IncomeFilters
           incomes={allIncomes}
@@ -409,10 +282,18 @@ const Incomes = () => {
             filteredIncomes={filteredIncomes}
             filteredFixedTotal={filteredFixedTotal}
             filteredVariableTotal={filteredVariableTotal}
-            onEdit={startEdit}
+            onEdit={openEditDialog}
             onDelete={handleDeleteIncome}
           />
         )}
+
+        {/* Income Dialog */}
+        <IncomeDialog
+          income={editingIncome}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSuccess={handleDialogSuccess}
+        />
 
         {/* Confirm Delete Modal */}
         <ConfirmModal

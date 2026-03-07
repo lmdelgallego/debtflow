@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/context/auth-context";
 import { ToastProvider } from "@/components/ui/Toast";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -30,10 +32,9 @@ export default function RootLayout({
     <html lang="es" className="relative min-h-full dark">
       <body
         className={cn(
-          "bg-background font-sans antialiased grainy",
-          geistSans.variable,
-          geistMono.variable,
-          "antialiased"
+          "bg-background font-sans antialiased",
+          ibmPlexSans.variable,
+          ibmPlexMono.variable
         )}
       >
         <ToastProvider>
