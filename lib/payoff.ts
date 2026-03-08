@@ -142,27 +142,49 @@ export function simulatePortfolio(
       }
     }
 
-    // 2. Apply minimum payments to all debts
-    let remaining = monthlyBudget;
-    for (let i = 0; i < sorted.length; i++) {
-      if (balances[i] > 0 && remaining > 0) {
-        const minPayment = Math.min(sorted[i].minimum_payment, balances[i], remaining);
-        balances[i] -= minPayment;
-        totalPaid += minPayment;
-        remaining -= minPayment;
-        balances[i] = Math.max(0, Math.round(balances[i] * 100) / 100);
-      }
-    }
+    // 2. Compute total minimums due this month across all active debts
+    const totalMinsDue = sorted.reduce(
+      (s, d, i) => s + (balances[i] > 0 ? Math.min(d.minimum_payment, balances[i]) : 0),
+      0,
+    );
 
-    // 3. Apply extra budget to the target debt (first with balance > 0)
-    for (let i = 0; i < sorted.length; i++) {
-      if (balances[i] > 0 && remaining > 0) {
-        const extraPayment = Math.min(balances[i], remaining);
-        balances[i] -= extraPayment;
-        totalPaid += extraPayment;
-        remaining -= extraPayment;
-        balances[i] = Math.max(0, Math.round(balances[i] * 100) / 100);
-        break;
+    let remaining = monthlyBudget;
+
+    if (remaining >= totalMinsDue) {
+      // Normal mode: budget covers all minimums.
+      // Pay every debt its minimum first, then dump the surplus on the target.
+      for (let i = 0; i < sorted.length; i++) {
+        if (balances[i] > 0) {
+          const minPayment = Math.min(sorted[i].minimum_payment, balances[i]);
+          balances[i] = Math.max(0, Math.round((balances[i] - minPayment) * 100) / 100);
+          totalPaid += minPayment;
+          remaining -= minPayment;
+        }
+      }
+
+      // 3. Apply extra budget to the target debt (first with balance > 0)
+      for (let i = 0; i < sorted.length; i++) {
+        if (balances[i] > 0 && remaining > 0) {
+          const extraPayment = Math.min(balances[i], remaining);
+          balances[i] = Math.max(0, Math.round((balances[i] - extraPayment) * 100) / 100);
+          totalPaid += extraPayment;
+          remaining -= extraPayment;
+          break;
+        }
+      }
+    } else {
+      // Crisis mode: budget doesn't cover all minimums.
+      // Distribute proportionally so every active debt gets some payment.
+      for (let i = 0; i < sorted.length; i++) {
+        if (balances[i] > 0 && totalMinsDue > 0) {
+          const minDue = Math.min(sorted[i].minimum_payment, balances[i]);
+          const proportional = Math.round(
+            (monthlyBudget * (minDue / totalMinsDue)) * 100,
+          ) / 100;
+          const payment = Math.min(proportional, balances[i]);
+          balances[i] = Math.max(0, Math.round((balances[i] - payment) * 100) / 100);
+          totalPaid += payment;
+        }
       }
     }
   }

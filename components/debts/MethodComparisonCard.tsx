@@ -300,9 +300,13 @@ export function MethodComparisonCard({
           )}
           {Math.abs(monthsDelta) > 0 && (
             <DeltaPill
-              label={avalancheWinsInterest ? 'Diferencia de tiempo' : 'Meses más rápido (Snowball)'}
-              value={`${Math.abs(monthsDelta)} mes${Math.abs(monthsDelta) === 1 ? '' : 'es'}`}
-              positive={false}
+              label={
+                monthsDelta < 0
+                  ? `Snowball ${Math.abs(monthsDelta)} mes${Math.abs(monthsDelta) === 1 ? '' : 'es'} más rápido`
+                  : `Avalancha ${monthsDelta} mes${monthsDelta === 1 ? '' : 'es'} más rápido`
+              }
+              value={monthsDelta < 0 ? 'a cambio de más intereses' : 'y con menos intereses'}
+              positive={monthsDelta > 0}
               icon={Clock}
             />
           )}

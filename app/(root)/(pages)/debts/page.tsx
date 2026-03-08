@@ -8,6 +8,8 @@ import { fetchDebts, fetchAllDebts, deleteDebt } from '@/lib/actions/debts.actio
 import type { Debt } from '@/lib/actions/debts.action';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses } from '@/lib/actions/expenses.action';
+import { fetchAllIncomes } from '@/lib/actions/incomes.action';
+import { fetchAllExpenses } from '@/lib/actions/expenses.action';
 import { DebtDialog } from '@/components/debts/DebtDialog';
 import { DebtSummaryCards } from '@/components/debts/DebtSummaryCards';
 import { DebtTargetCard } from '@/components/debts/DebtTargetCard';
@@ -22,6 +24,8 @@ const Debts = () => {
   const { addToast } = useToast();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [allDebts, setAllDebts] = useState<Debt[]>([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -47,8 +51,14 @@ const Debts = () => {
   }, [addToast, page, pageSize]);
 
   // Fetch all debts + income + expenses (para summary cards y target card)
+  // Fetch all debts + income + expenses (para summary cards y target card)
   const loadAllDebts = useCallback(async () => {
     setLoadingAll(true);
+    const [debtRes, incomeRes, expenseRes] = await Promise.all([
+      fetchAllDebts(),
+      fetchAllIncomes(),
+      fetchAllExpenses(),
+    ]);
     const [debtRes, incomeRes, expenseRes] = await Promise.all([
       fetchAllDebts(),
       fetchAllIncomes(),
@@ -57,9 +67,14 @@ const Debts = () => {
 
     if (debtRes.error) {
       console.error('Error fetching all debts:', debtRes.error);
+    if (debtRes.error) {
+      console.error('Error fetching all debts:', debtRes.error);
     } else {
       setAllDebts(debtRes.data || []);
+      setAllDebts(debtRes.data || []);
     }
+    setTotalIncome((incomeRes.data || []).reduce((s, i) => s + i.amount, 0));
+    setTotalExpenses((expenseRes.data || []).reduce((s, e) => s + e.amount, 0));
     setTotalIncome((incomeRes.data || []).reduce((s, i) => s + i.amount, 0));
     setTotalExpenses((expenseRes.data || []).reduce((s, e) => s + e.amount, 0));
     setLoadingAll(false);
