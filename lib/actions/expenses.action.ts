@@ -9,6 +9,7 @@ export interface Expense {
   description?: string;
   amount: number;
   date: string;
+  is_recurring?: boolean;
   created_at: string;
 }
 
@@ -26,6 +27,7 @@ export interface CreateExpenseInput {
   description?: string;
   amount: number;
   date: string;
+  is_recurring?: boolean;
 }
 
 interface UpdateExpenseInput extends CreateExpenseInput {
@@ -138,6 +140,7 @@ export async function createExpense(input: CreateExpenseInput): Promise<{ data: 
           description: input.description || null,
           amount: parseFloat(input.amount.toString()),
           date: input.date,
+          is_recurring: input.is_recurring ?? false,
         },
       ])
       .select()
@@ -173,6 +176,7 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<{ data: 
         description: input.description || null,
         amount: parseFloat(input.amount.toString()),
         date: input.date,
+        is_recurring: input.is_recurring ?? false,
       })
       .eq('id', input.id)
       .eq('user_id', user.id)
@@ -214,5 +218,119 @@ export async function deleteExpense(id: string): Promise<{ success: boolean; err
     return { success: true, error: null };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Sincroniza los gastos recurrentes del mes anterior al mes actual.
+ * Se llama silenciosamente al cargar el dashboard.
+ */
+export async function syncRecurringExpenses(): Promise<{ success: boolean; error: string | null; count: number }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado', count: 0 };
+    }
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    // Determinar el mes anterior
+    let prevYear = currentYear;
+    let prevMonth = currentMonth - 1;
+    if (prevMonth < 0) {
+      prevMonth = 11;
+      prevYear -= 1;
+    }
+
+    // Fechas de inicio y fin del mes anterior
+    const prevMonthStartDate = new Date(prevYear, prevMonth, 1).toISOString().split('T')[0];
+    const prevMonthEndDate = new Date(prevYear, prevMonth + 1, 0).toISOString().split('T')[0];
+
+    // Buscar gastos recurrentes del mes anterior
+    const { data: prevRecurring, error: prevError } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_recurring', true)
+      .gte('date', prevMonthStartDate)
+      .lte('date', prevMonthEndDate);
+
+    if (prevError) {
+      return { success: false, error: prevError.message, count: 0 };
+    }
+
+    if (!prevRecurring || prevRecurring.length === 0) {
+      return { success: true, error: null, count: 0 };
+    }
+
+    // Fechas de inicio y fin del mes actual
+    const currentMonthStartDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+    const currentMonthEndDate = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+    // Buscar gastos recurrentes que ya existan en el mes actual (para no duplicar)
+    const { data: currentRecurring, error: currentError } = await supabase
+      .from('expenses')
+      .select('category, subcategory, description, amount')
+      .eq('user_id', user.id)
+      .eq('is_recurring', true)
+      .gte('date', currentMonthStartDate)
+      .lte('date', currentMonthEndDate);
+
+    if (currentError) {
+      return { success: false, error: currentError.message, count: 0 };
+    }
+
+    // Filtrar los gastos que aún no se han copiado
+    const toInsert = prevRecurring.filter(prevExp => {
+      // Consideramos que ya se copió si hay uno con la misma categoría, descripción y monto literal
+      const exists = currentRecurring?.some(currExp => 
+        currExp.category === prevExp.category &&
+        currExp.description === prevExp.description &&
+        currExp.amount === prevExp.amount
+      );
+      return !exists;
+    }).map(exp => {
+      // Ajustar la fecha al mes actual manteniendo el mismo día si es posible
+      // Se añade o reemplaza 'T' temporalmente por seguridad si no existe, pero viene de date column
+      const oldDateStr = exp.date.includes('T') ? exp.date : `${exp.date}T00:00:00`;
+      const oldDate = new Date(oldDateStr);
+      let newDay = oldDate.getDate();
+      const lastDayOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      if (newDay > lastDayOfCurrentMonth) {
+         newDay = lastDayOfCurrentMonth;
+      }
+      
+      const newDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
+      
+      return {
+        user_id: user.id,
+        category: exp.category,
+        subcategory: exp.subcategory,
+        description: exp.description,
+        amount: exp.amount,
+        date: newDateStr,
+        is_recurring: true,
+      };
+    });
+
+    if (toInsert.length === 0) {
+      return { success: true, error: null, count: 0 };
+    }
+
+    const { error: insertError } = await supabase
+      .from('expenses')
+      .insert(toInsert);
+
+    if (insertError) {
+      return { success: false, error: insertError.message, count: 0 };
+    }
+
+    return { success: true, error: null, count: toInsert.length };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido', count: 0 };
   }
 }
