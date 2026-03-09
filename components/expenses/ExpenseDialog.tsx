@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createExpense, updateExpense } from '@/lib/actions/expenses.action'
@@ -39,6 +40,7 @@ const expenseSchema = z.object({
   description: z.string().min(1, 'Ingresa una descripción'),
   amount: z.string().min(1, 'Ingresa un monto'),
   date: z.string().min(1, 'Selecciona una fecha'),
+  is_recurring: z.boolean(),
 })
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>
@@ -61,6 +63,7 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
       description: '',
       amount: '',
       date: new Date().toISOString().split('T')[0],
+      is_recurring: false,
     },
   })
 
@@ -71,6 +74,7 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
         description: expense.description || '',
         amount: expense.amount.toString(),
         date: expense.date,
+        is_recurring: expense.is_recurring ?? false,
       })
     } else {
       form.reset({
@@ -78,6 +82,7 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
         description: '',
         amount: '',
         date: new Date().toISOString().split('T')[0],
+        is_recurring: false,
       })
     }
   }, [expense, form])
@@ -93,6 +98,7 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
         description: values.description || undefined,
         amount,
         date: values.date,
+        is_recurring: values.is_recurring,
       })
 
       if (error) {
@@ -109,6 +115,7 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
         description: values.description || undefined,
         amount,
         date: values.date,
+        is_recurring: values.is_recurring,
       })
 
       if (error) {
@@ -195,6 +202,26 @@ export function ExpenseDialog({ expense, open, onOpenChange, onSuccess }: Expens
                     <Input type="date" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_recurring"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Gasto Recurrente</FormLabel>
+                    <DialogDescription>
+                      Este gasto se copiará automáticamente los próximos meses.
+                    </DialogDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />
