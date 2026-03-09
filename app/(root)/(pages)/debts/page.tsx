@@ -68,7 +68,8 @@ const Debts = () => {
 
   useEffect(() => {
     loadDebts();
-  }, [loadDebts]);
+    loadAllDebts();
+  }, [loadDebts, loadAllDebts]);
 
 
   const openCreateDialog = () => {
