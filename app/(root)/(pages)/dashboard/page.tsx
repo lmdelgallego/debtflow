@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DollarSign, CreditCard, HandCoins, LayoutDashboard } from 'lucide-react';
+import { DollarSign, CreditCard, HandCoins, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
-import { fetchAllExpenses } from '@/lib/actions/expenses.action';
+import { fetchAllExpenses, syncRecurringExpenses } from '@/lib/actions/expenses.action';
 import { fetchAllDebts } from '@/lib/actions/debts.action';
 import type { Income } from '@/lib/actions/incomes.action';
 import type { Expense } from '@/lib/actions/expenses.action';
@@ -67,13 +68,13 @@ function buildSparkline(
     .map(([, v]) => v);
 }
 
-function filterCurrentMonth<T extends { created_at?: string; date?: string }>(
+function filterByMonth<T extends { created_at?: string; date?: string }>(
   items: T[],
+  selectedDate: Date,
   dateField: 'created_at' | 'date' = 'created_at',
 ): T[] {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-indexed
+  const currentYear = selectedDate.getFullYear();
+  const currentMonth = selectedDate.getMonth(); // 0-indexed
 
   return items.filter((item) => {
     const d = new Date(
@@ -83,15 +84,28 @@ function filterCurrentMonth<T extends { created_at?: string; date?: string }>(
   });
 }
 
+function calculateTrend(current: number, previous: number) {
+  if (previous === 0) {
+    if (current === 0) return { value: 0 };
+    return { value: 100 }; // 100% increase from 0
+  }
+  const diff = ((current - previous) / previous) * 100;
+  return { value: diff };
+}
+
 const Dashboard = () => {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
+      // Sincronizar gastos recurrentes antes de cargar los datos
+      await syncRecurringExpenses();
+
       const [incomeRes, expenseRes, debtRes] = await Promise.all([
         fetchAllIncomes(),
         fetchAllExpenses(),
@@ -110,25 +124,55 @@ const Dashboard = () => {
     };
   }, []);
 
+  const handlePrevMonth = () => {
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
   const totalIncomes = incomes.reduce((s, i) => s + i.amount, 0);
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const activeDebts = debts.filter((d) => d.balance > 0);
   const totalDebt = activeDebts.reduce((s, d) => s + d.balance, 0);
 
-  // ── Monthly cash flow (current month only) ─────────────────────────────
-  const currentMonthIncomes = filterCurrentMonth(incomes, 'created_at');
-  const currentMonthExpenses = filterCurrentMonth(expenses, 'date');
+  // ── Monthly cash flow (selected month) ─────────────────────────────
+  const currentMonthIncomes = filterByMonth(incomes, selectedDate, 'created_at');
+  const currentMonthExpenses = filterByMonth(expenses, selectedDate, 'date');
 
   const monthlyIncomeTotal = currentMonthIncomes.reduce((s, i) => s + i.amount, 0);
   const monthlyExpenseTotal = currentMonthExpenses.reduce((s, e) => s + e.amount, 0);
   const monthlyDebtPayments = activeDebts.reduce((s, d) => s + d.minimum_payment, 0);
 
-  const now = new Date();
+  // ── Prvious month data for trend calculation ─────────────────────────
+  const prevMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+  const prevMonthIncomes = filterByMonth(incomes, prevMonthDate, 'created_at');
+  const prevMonthExpenses = filterByMonth(expenses, prevMonthDate, 'date');
+  
+  const prevMonthlyIncomeTotal = prevMonthIncomes.reduce((s, i) => s + i.amount, 0);
+  const prevMonthlyExpenseTotal = prevMonthExpenses.reduce((s, e) => s + e.amount, 0);
+  const prevAvailableFlow = prevMonthlyIncomeTotal - prevMonthlyExpenseTotal - monthlyDebtPayments;
+  const currentAvailableFlow = monthlyIncomeTotal - monthlyExpenseTotal - monthlyDebtPayments;
+
+  const incomeTrend = {
+    ...calculateTrend(monthlyIncomeTotal, prevMonthlyIncomeTotal),
+    isPositiveGood: true
+  };
+  const expenseTrend = {
+    ...calculateTrend(monthlyExpenseTotal, prevMonthlyExpenseTotal),
+    isPositiveGood: false
+  };
+  const flowTrend = {
+    ...calculateTrend(currentAvailableFlow, prevAvailableFlow),
+    isPositiveGood: true
+  };
+
   const MONTH_NAMES_ES = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
-  const monthLabel = `${MONTH_NAMES_ES[now.getMonth()]} ${now.getFullYear()}`;
+  const monthLabel = `${MONTH_NAMES_ES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
 
   // ── Top 3 items ──────────────────────────────────────────────────────────
   const topDebts = [...activeDebts]
@@ -152,9 +196,24 @@ const Dashboard = () => {
 
   return (
     <>
-      <header className="space-y-1 animate-fade-in">
-        <h1 className="text-2xl font-semibold">Resumen Financiero</h1>
-        <p className="text-muted-foreground text-sm">Vista general de tu situación financiera actual.</p>
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 animate-fade-in mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Resumen Financiero</h1>
+          <p className="text-muted-foreground text-sm">Vista general de tu situación financiera actual.</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="w-32 text-center font-medium capitalize">
+            {monthLabel}
+          </div>
+          <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={
+            selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()
+          }>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </header>
 
       {loading ? (
@@ -178,6 +237,7 @@ const Dashboard = () => {
               monthlyExpenses={monthlyExpenseTotal}
               monthlyDebtPayments={monthlyDebtPayments}
               monthLabel={monthLabel}
+              trend={flowTrend}
               index={0}
             />
             <SummaryCard
@@ -200,23 +260,25 @@ const Dashboard = () => {
           {/* ─── Zona 2: Contexto — Ingresos, Gastos y Próxima Deuda ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <SummaryCard
-              label="Ingresos Totales"
-              value={totalIncomes}
+              label="Ingresos del Mes"
+              value={monthlyIncomeTotal}
               icon={DollarSign}
               accentClass="border-t-income"
               iconBg="bg-income/10 text-income"
               sparklineData={incomeSparkline}
               sparklineColor="oklch(0.72 0.17 162)"
+              trend={incomeTrend}
               index={2}
             />
             <SummaryCard
-              label="Gastos Totales"
-              value={totalExpenses}
+              label="Gastos del Mes"
+              value={monthlyExpenseTotal}
               icon={CreditCard}
               accentClass="border-t-expense"
               iconBg="bg-expense/10 text-expense"
               sparklineData={expenseSparkline}
               sparklineColor="oklch(0.80 0.15 80)"
+              trend={expenseTrend}
               index={3}
               topItems={topExpenses}
             />
