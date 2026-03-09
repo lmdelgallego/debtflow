@@ -9,6 +9,7 @@ import type { Debt } from '@/lib/actions/debts.action';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses } from '@/lib/actions/expenses.action';
 import { DebtDialog } from '@/components/debts/DebtDialog';
+import { PayDebtDialog } from '@/components/debts/PayDebtDialog';
 import { DebtSummaryCards } from '@/components/debts/DebtSummaryCards';
 import { DebtTargetCard } from '@/components/debts/DebtTargetCard';
 import { MethodComparisonCard } from '@/components/debts/MethodComparisonCard';
@@ -27,7 +28,9 @@ const Debts = () => {
   const [loading, setLoading] = useState(true);
   const [loadingAll, setLoadingAll] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [payingDebt, setPayingDebt] = useState<Debt | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
@@ -80,6 +83,11 @@ const Debts = () => {
   const openEditDialog = (debt: Debt) => {
     setEditingDebt(debt);
     setDialogOpen(true);
+  };
+
+  const openPayDialog = (debt: Debt) => {
+    setPayingDebt(debt);
+    setPayDialogOpen(true);
   };
 
   const handleDialogSuccess = () => {
@@ -188,6 +196,7 @@ const Debts = () => {
           loading={loading}
           filteredDebts={filteredDebts}
           onEdit={openEditDialog}
+          onPay={openPayDialog}
           onDelete={handleDeleteDebt}
         />
       )}
@@ -197,6 +206,14 @@ const Debts = () => {
         debt={editingDebt}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        onSuccess={handleDialogSuccess}
+      />
+
+      {/* Pay Debt Dialog */}
+      <PayDebtDialog
+        debt={payingDebt}
+        open={payDialogOpen}
+        onOpenChange={setPayDialogOpen}
         onSuccess={handleDialogSuccess}
       />
 
