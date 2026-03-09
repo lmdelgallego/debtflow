@@ -13,6 +13,11 @@ interface CashFlowCardProps {
   monthlyDebtPayments: number;
   /** Nombre del mes actual, ej. "Marzo 2026" */
   monthLabel: string;
+  /** Optional trend percentage vs last month */
+  trend?: {
+    value: number;
+    isPositiveGood: boolean;
+  };
   index?: number;
 }
 
@@ -25,6 +30,7 @@ export function CashFlowCard({
   monthlyExpenses,
   monthlyDebtPayments,
   monthLabel,
+  trend,
   index = 0,
 }: CashFlowCardProps) {
   const grossFlow = monthlyIncomes - monthlyExpenses;
@@ -65,14 +71,28 @@ export function CashFlowCard({
           </div>
 
           {/* Main value (Available Flow) */}
-          <p
-            className={cn(
-              'text-4xl font-semibold font-mono animate-count-up',
-              isAvailablePositive ? 'text-income' : 'text-expense',
+          <div className="flex items-baseline gap-3">
+            <p
+              className={cn(
+                'text-4xl font-semibold font-mono animate-count-up',
+                isAvailablePositive ? 'text-income' : 'text-expense',
+              )}
+            >
+              {isAvailablePositive ? '+' : '-'}${fmt(Math.abs(availableFlow))}
+            </p>
+            {trend && (
+              <div className={cn('flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded-full mb-1',
+                trend.value > 0
+                  ? (trend.isPositiveGood ? 'bg-income/10 text-income' : 'bg-expense/10 text-expense')
+                  : trend.value < 0
+                  ? (trend.isPositiveGood ? 'bg-expense/10 text-expense' : 'bg-income/10 text-income')
+                  : 'bg-muted text-muted-foreground'
+              )}>
+                {trend.value > 0 ? <ArrowUp size={14} /> : trend.value < 0 ? <ArrowDown size={14} /> : null}
+                <span>{Math.abs(trend.value).toFixed(1)}%</span>
+              </div>
             )}
-          >
-            {isAvailablePositive ? '+' : '-'}${fmt(Math.abs(availableFlow))}
-          </p>
+          </div>
 
           {/* Trend label */}
           <p className="text-xs text-muted-foreground">

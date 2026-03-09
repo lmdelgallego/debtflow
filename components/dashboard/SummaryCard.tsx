@@ -16,8 +16,11 @@ interface SummaryCardProps {
   sparklineColor?: string;
   index?: number;
   size?: 'default' | 'hero';
-  /** If provided, shows a positive/negative trend indicator */
-  trend?: 'positive' | 'negative' | 'neutral';
+  /** Optional trend percentage vs last month */
+  trend?: {
+    value: number;
+    isPositiveGood: boolean;
+  };
   /** Small descriptive note below the value */
   hint?: string;
   /** Optional top items list to display below the card */
@@ -42,9 +45,19 @@ export function SummaryCard({
 
   const isHero = size === 'hero';
 
-  const TrendIcon = trend === 'positive' ? TrendingUp : TrendingDown;
-  const trendColor =
-    trend === 'positive' ? 'text-income' : trend === 'negative' ? 'text-expense' : 'text-muted-foreground';
+  let TrendIcon = TrendingUp;
+  let trendColor = 'text-muted-foreground';
+  let trendFormatted = '';
+
+  if (trend) {
+    TrendIcon = trend.value >= 0 ? TrendingUp : TrendingDown;
+    if (trend.value > 0) {
+      trendColor = trend.isPositiveGood ? 'text-income' : 'text-expense';
+    } else if (trend.value < 0) {
+      trendColor = trend.isPositiveGood ? 'text-expense' : 'text-income';
+    }
+    trendFormatted = `${trend.value > 0 ? '+' : ''}${trend.value.toFixed(1)}% vs mes pasado`;
+  }
 
   return (
     <Card
@@ -62,16 +75,14 @@ export function SummaryCard({
             className={cn(
               'font-semibold font-mono animate-count-up',
               isHero ? 'text-4xl' : 'text-2xl',
-              trend === 'positive' && 'text-income',
-              trend === 'negative' && 'text-expense',
             )}
           >
             ${value.toLocaleString()}
           </p>
-          {trend && trend !== 'neutral' && (
+          {trend && (
             <div className={cn('flex items-center gap-1.5 text-xs font-medium', trendColor)}>
               <TrendIcon size={12} />
-              <span>{trend === 'positive' ? 'Flujo positivo' : 'Flujo negativo'}</span>
+              <span>{trendFormatted}</span>
             </div>
           )}
           {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
