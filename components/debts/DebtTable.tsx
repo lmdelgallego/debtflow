@@ -13,7 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Trash2, Edit2, HandCoins, SearchX } from 'lucide-react';
+import { Trash2, Edit2, HandCoins, SearchX, Coins } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { Debt } from '@/lib/actions/debts.action';
 
@@ -22,10 +22,11 @@ interface DebtTableProps {
   loading: boolean;
   filteredDebts: Debt[];
   onEdit: (debt: Debt) => void;
+  onPay: (debt: Debt) => void;
   onDelete: (id: string) => Promise<void>;
 }
 
-function MobileDebtCard({ debt, onEdit, onDelete }: { debt: Debt; onEdit: (debt: Debt) => void; onDelete: (id: string) => Promise<void> }) {
+function MobileDebtCard({ debt, onEdit, onPay, onDelete }: { debt: Debt; onEdit: (debt: Debt) => void; onPay: (debt: Debt) => void; onDelete: (id: string) => Promise<void> }) {
   return (
     <div className="p-4 rounded-lg border border-border bg-card animate-fade-in-up">
       <div className="flex items-start justify-between mb-2">
@@ -42,6 +43,9 @@ function MobileDebtCard({ debt, onEdit, onDelete }: { debt: Debt; onEdit: (debt:
           <p className="text-xs text-muted-foreground">Mín: <span className="font-mono">${debt.minimum_payment.toLocaleString()}</span></p>
         </div>
         <div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={() => onPay(debt)} className="gap-1 h-8 text-income hover:text-income hover:bg-income/10">
+            <Coins size={14} />
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => onEdit(debt)} className="gap-1 h-8">
             <Edit2 size={14} />
           </Button>
@@ -64,6 +68,7 @@ export function DebtTable({
   loading,
   filteredDebts,
   onEdit,
+  onPay,
   onDelete,
 }: DebtTableProps) {
   const totalBalance = filteredDebts.reduce((sum, d) => sum + d.balance, 0);
@@ -125,6 +130,20 @@ export function DebtTable({
                             <Button
                               size="sm"
                               variant="ghost"
+                              onClick={() => onPay(debt)}
+                              className="gap-1 h-8 text-income hover:text-income hover:bg-income/10"
+                            >
+                              <Coins size={14} />
+                              Pagar
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Registrar abono a deuda</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               onClick={() => onEdit(debt)}
                               className="gap-1 h-8"
                             >
@@ -163,6 +182,7 @@ export function DebtTable({
                 key={debt.id}
                 debt={debt}
                 onEdit={onEdit}
+                onPay={onPay}
                 onDelete={onDelete}
               />
             ))}

@@ -217,3 +217,81 @@ export async function deleteDebt(id: string): Promise<{ success: boolean; error:
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
+
+/**
+ * Paga una parte o el total de una deuda y registra opcionalmente el gasto.
+ */
+export async function payDebt(
+  debtId: string,
+  amount: number,
+  createExpenseLog: boolean = true
+): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado' };
+    }
+
+    // 1. Obtener la deuda actual
+    const { data: debt, error: fetchError } = await supabase
+      .from('debts')
+      .select('*')
+      .eq('id', debtId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !debt) {
+      return { success: false, error: 'Deuda no encontrada' };
+    }
+
+    if (amount <= 0) {
+      return { success: false, error: 'El monto a pagar debe ser mayor a 0' };
+    }
+
+    if (amount > debt.balance) {
+      return { success: false, error: 'El monto a pagar no puede superar el balance actual' };
+    }
+
+    // 2. Actualizar el balance
+    const newBalance = debt.balance - amount;
+    const { error: updateError } = await supabase
+      .from('debts')
+      .update({ balance: newBalance })
+      .eq('id', debtId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // 3. Crear el gasto si el usuario lo confirmó
+    if (createExpenseLog) {
+      const { error: expenseError } = await supabase
+        .from('expenses')
+        .insert([
+          {
+            user_id: user.id,
+            category: 'Pagos de Deudas',
+            subcategory: debt.name,
+            description: `Abono a deuda: ${debt.name}`,
+            amount: amount,
+            date: new Date().toISOString().split('T')[0],
+            is_recurring: false,
+          },
+        ]);
+
+      if (expenseError) {
+        // Falló el registro del gasto, pero la deuda sí se pagó. Lo logueamos.
+        console.error('Error creando gasto para pago de deuda:', expenseError);
+        return { success: true, error: null }; // Devolvemos éxito parcial
+      }
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
