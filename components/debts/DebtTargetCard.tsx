@@ -194,7 +194,7 @@ export function DebtTargetCard({
   }, [result]);
 
   return (
-    <Card className="border-t-2 border-t-debt card-hover animate-fade-in-up stagger-1 overflow-hidden">
+    <Card className="border-t-2 border-t-debt animate-fade-in-up stagger-1 overflow-hidden">
       {/* Header strip */}
       <div className="px-5 pt-5 pb-3 flex items-start justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">

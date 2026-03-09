@@ -30,7 +30,7 @@ function MobileExpenseCard({ expense, onEdit, onDelete }: { expense: Expense; on
   const Icon = category?.icon;
 
   return (
-    <div className="p-4 rounded-lg border border-border bg-card card-hover animate-fade-in-up">
+    <div className="p-4 rounded-lg border border-border bg-card animate-fade-in-up">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {Icon && <Icon size={14} className="text-muted-foreground shrink-0" />}

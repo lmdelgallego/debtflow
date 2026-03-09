@@ -27,7 +27,7 @@ interface DebtTableProps {
 
 function MobileDebtCard({ debt, onEdit, onDelete }: { debt: Debt; onEdit: (debt: Debt) => void; onDelete: (id: string) => Promise<void> }) {
   return (
-    <div className="p-4 rounded-lg border border-border bg-card card-hover animate-fade-in-up">
+    <div className="p-4 rounded-lg border border-border bg-card animate-fade-in-up">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{debt.name}</p>

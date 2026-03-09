@@ -33,7 +33,7 @@ export function NextDebtCard({ avalanche, index = 4 }: NextDebtCardProps) {
 
   return (
     <Card
-      className={`p-5 border-t-2 border-t-debt card-hover animate-fade-in-up stagger-${index + 1} flex flex-col gap-4`}
+      className={`p-5 border-t-2 border-t-debt animate-fade-in-up stagger-${index + 1} flex flex-col gap-4`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
