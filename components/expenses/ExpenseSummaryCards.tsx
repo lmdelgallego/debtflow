@@ -48,7 +48,7 @@ export function ExpenseSummaryCards({ totalExpenses, topCategoryValue, topCatego
       {cards.map((card, i) => (
         <Card
           key={card.key}
-          className={`p-5 border-t-2 ${card.accent} card-hover animate-fade-in-up stagger-${i + 1}`}
+          className={`p-5 border-t-2 ${card.accent} animate-fade-in-up stagger-${i + 1}`}
         >
           <div className="flex items-start justify-between">
             <div className="space-y-1">

@@ -194,7 +194,7 @@ const ExpensesPage = () => {
       {/* Charts */}
       {loadingCharts ? <ChartSkeleton /> : allExpenses.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <Card className="sm:col-span-1 card-hover animate-fade-in-up stagger-1">
+          <Card className="sm:col-span-1 animate-fade-in-up stagger-1">
             <CardHeader>
               <CardTitle>Distribución por Categoría</CardTitle>
             </CardHeader>

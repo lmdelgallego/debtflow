@@ -49,7 +49,7 @@ export function SummaryCard({
   return (
     <Card
       className={cn(
-        `border-t-2 ${accentClass} card-hover animate-fade-in-up stagger-${index + 1}`,
+        `border-t-2 ${accentClass} animate-fade-in-up stagger-${index + 1}`,
         isHero ? 'p-6' : 'p-5',
       )}
     >

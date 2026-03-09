@@ -37,7 +37,7 @@ export function CashFlowCard({
   return (
     <Card
       className={cn(
-        'border-t-2 card-hover animate-fade-in-up p-6 overflow-hidden relative',
+        'border-t-2 animate-fade-in-up p-6 overflow-hidden relative',
         `stagger-${index + 1}`,
         isAvailablePositive ? 'border-t-[var(--primary)]' : 'border-t-[var(--expense)]',
       )}

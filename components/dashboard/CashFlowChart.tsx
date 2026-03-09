@@ -38,7 +38,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export function CashFlowChart({ data }: CashFlowChartProps) {
   return (
-    <Card className="animate-fade-in-up stagger-3 card-hover">
+    <Card className="animate-fade-in-up stagger-3">
       <CardHeader>
         <CardTitle>Ingresos vs Gastos</CardTitle>
       </CardHeader>
