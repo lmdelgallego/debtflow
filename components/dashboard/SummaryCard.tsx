@@ -20,6 +20,8 @@ interface SummaryCardProps {
   trend?: 'positive' | 'negative' | 'neutral';
   /** Small descriptive note below the value */
   hint?: string;
+  /** Optional top items list to display below the card */
+  topItems?: { name: string; amount: number }[];
 }
 
 export function SummaryCard({
@@ -34,6 +36,7 @@ export function SummaryCard({
   size = 'default',
   trend,
   hint,
+  topItems,
 }: SummaryCardProps) {
   const chartData = sparklineData?.map((v) => ({ value: v })) || [];
 
@@ -90,6 +93,22 @@ export function SummaryCard({
               />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+      
+      {/* Top Items section */}
+      {topItems && topItems.length > 0 && (
+        <div className="mt-4 space-y-2 border-t border-border/40 pt-3">
+          {topItems.map((item, i) => (
+            <div key={i} className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground truncate pr-2 max-w-[65%]">
+                {item.name}
+              </span>
+              <span className="font-mono font-medium truncate">
+                ${item.amount.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </Card>

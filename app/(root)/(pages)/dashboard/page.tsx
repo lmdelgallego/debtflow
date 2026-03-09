@@ -116,8 +116,11 @@ const Dashboard = () => {
   const totalDebt = activeDebts.reduce((s, d) => s + d.balance, 0);
 
   // ── Monthly cash flow (current month only) ─────────────────────────────
-  const monthlyIncomeTotal = filterCurrentMonth(incomes, 'created_at').reduce((s, i) => s + i.amount, 0);
-  const monthlyExpenseTotal = filterCurrentMonth(expenses, 'date').reduce((s, e) => s + e.amount, 0);
+  const currentMonthIncomes = filterCurrentMonth(incomes, 'created_at');
+  const currentMonthExpenses = filterCurrentMonth(expenses, 'date');
+
+  const monthlyIncomeTotal = currentMonthIncomes.reduce((s, i) => s + i.amount, 0);
+  const monthlyExpenseTotal = currentMonthExpenses.reduce((s, e) => s + e.amount, 0);
   const monthlyDebtPayments = activeDebts.reduce((s, d) => s + d.minimum_payment, 0);
 
   const now = new Date();
@@ -126,6 +129,17 @@ const Dashboard = () => {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
   const monthLabel = `${MONTH_NAMES_ES[now.getMonth()]} ${now.getFullYear()}`;
+
+  // ── Top 3 items ──────────────────────────────────────────────────────────
+  const topDebts = [...activeDebts]
+    .sort((a, b) => b.balance - a.balance)
+    .slice(0, 3)
+    .map(d => ({ name: d.name, amount: d.balance }));
+
+  const topExpenses = [...currentMonthExpenses]
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 3)
+    .map(e => ({ name: e.description || e.category, amount: e.amount }));
 
   const avalanche: AvalancheResult | null =
     activeDebts.length > 0 ? calculateAvalanche(debts, totalIncomes, totalExpenses) : null;
@@ -179,6 +193,7 @@ const Dashboard = () => {
                   ? `${activeDebts.length} deuda${activeDebts.length === 1 ? '' : 's'} activa${activeDebts.length === 1 ? '' : 's'}`
                   : 'Sin deudas activas'
               }
+              topItems={topDebts}
             />
           </div>
 
@@ -203,6 +218,7 @@ const Dashboard = () => {
               sparklineData={expenseSparkline}
               sparklineColor="oklch(0.80 0.15 80)"
               index={3}
+              topItems={topExpenses}
             />
             {avalanche && avalanche.orderedDebts.length > 0 ? (
               <NextDebtCard avalanche={avalanche} index={4} />
