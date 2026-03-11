@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DollarSign, CreditCard, HandCoins, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { DollarSign, CreditCard, HandCoins, LayoutDashboard } from 'lucide-react';
+import { MonthSelector } from '@/components/ui/MonthSelector';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses, syncRecurringExpenses } from '@/lib/actions/expenses.action';
 import { fetchAllDebts } from '@/lib/actions/debts.action';
@@ -174,6 +174,7 @@ const Dashboard = () => {
   ];
   const monthLabel = `${MONTH_NAMES_ES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
 
+
   // ── Top 3 items ──────────────────────────────────────────────────────────
   const topDebts = [...activeDebts]
     .sort((a, b) => b.balance - a.balance)
@@ -201,19 +202,11 @@ const Dashboard = () => {
           <h1 className="text-2xl font-semibold">Resumen Financiero</h1>
           <p className="text-muted-foreground text-sm">Vista general de tu situación financiera actual.</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="w-32 text-center font-medium capitalize">
-            {monthLabel}
-          </div>
-          <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={
-            selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()
-          }>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        <MonthSelector
+          selectedDate={selectedDate}
+          onPrevMonth={handlePrevMonth}
+          onNextMonth={handleNextMonth}
+        />
       </header>
 
       {loading ? (

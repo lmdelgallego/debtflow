@@ -273,7 +273,7 @@ export async function payDebt(
         .insert([
           {
             user_id: user.id,
-            category: 'Pagos de Deudas',
+            category: 'debt',
             subcategory: debt.name,
             description: `Abono a deuda: ${debt.name}`,
             amount: amount,

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus } from 'lucide-react'
+import { MonthSelector } from '@/components/ui/MonthSelector'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { fetchExpenses, fetchAllExpenses, deleteExpense } from '@/lib/actions/expenses.action'
 import type { Expense } from '@/lib/actions/expenses.action'
@@ -45,10 +46,19 @@ const ExpensesPage = () => {
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null })
   const [page] = useState(1)
   const pageSize = 10
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+
+  const selectedDateString = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-01`
+
+  const handlePrevMonth = () =>
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+
+  const handleNextMonth = () =>
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
 
   const loadExpenses = useCallback(async () => {
     setLoading(true)
-    const { data, error: fetchError } = await fetchExpenses(page, pageSize)
+    const { data, error: fetchError } = await fetchExpenses(page, pageSize, selectedDateString)
 
     if (fetchError) {
       addToast(fetchError, 'error')
@@ -56,11 +66,11 @@ const ExpensesPage = () => {
       setExpenses(data.data || [])
     }
     setLoading(false)
-  }, [addToast, page, pageSize])
+  }, [addToast, page, pageSize, selectedDateString])
 
   const loadAllExpenses = useCallback(async () => {
     setLoadingCharts(true)
-    const { data, error: fetchError } = await fetchAllExpenses()
+    const { data, error: fetchError } = await fetchAllExpenses(selectedDateString)
 
     if (fetchError) {
       console.error('Error fetching all expenses:', fetchError)
@@ -68,7 +78,7 @@ const ExpensesPage = () => {
       setAllExpenses(data || [])
     }
     setLoadingCharts(false)
-  }, [])
+  }, [selectedDateString])
 
   useEffect(() => {
     loadExpenses()
@@ -171,9 +181,16 @@ const ExpensesPage = () => {
         <PageHeader.Title>
           <div className="flex items-center justify-between gap-2">
             Gastos
-            <Button onClick={openCreateDialog}>
-              <Plus size={16} />Agregar Gasto
-            </Button>
+            <div className="flex items-center gap-3">
+              <MonthSelector
+                selectedDate={selectedDate}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+              />
+              <Button onClick={openCreateDialog}>
+                <Plus size={16} />Agregar Gasto
+              </Button>
+            </div>
           </div>
         </PageHeader.Title>
         <PageHeader.Description>

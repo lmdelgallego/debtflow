@@ -1,4 +1,4 @@
-import { Home, Car, Film, Lightbulb, ShoppingCart, HeartPulse, CreditCard } from 'lucide-react';
+import { Home, Car, Film, Lightbulb, ShoppingCart, HeartPulse, CreditCard, DollarSign } from 'lucide-react';
 
 export const EXPENSE_CATEGORIES = [
   { value: 'housing', label: 'Casa', icon: Home, color: 'oklch(0.72 0.17 162)' },
@@ -8,6 +8,7 @@ export const EXPENSE_CATEGORIES = [
   { value: 'food', label: 'Alimentación', icon: ShoppingCart, color: 'oklch(0.65 0.15 250)' },
   { value: 'health', label: 'Salud', icon: HeartPulse, color: 'oklch(0.63 0.21 25)' },
   { value: 'others', label: 'Otros', icon: CreditCard, color: 'oklch(0.60 0.10 260)' },
+  { value: 'debt', label: 'Deuda', icon: DollarSign, color: 'oklch(0.60 0.10 260)' },
 ] as const;
 
 export type ExpenseCategoryValue = typeof EXPENSE_CATEGORIES[number]['value'];

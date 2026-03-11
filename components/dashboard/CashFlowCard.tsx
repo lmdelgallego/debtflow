@@ -36,7 +36,7 @@ export function CashFlowCard({
   const grossFlow = monthlyIncomes - monthlyExpenses;
   // Disponible real es el principal ahora
   const availableFlow = grossFlow - monthlyDebtPayments;
-  
+
   const isAvailablePositive = availableFlow >= 0;
   const hasDebts = monthlyDebtPayments > 0;
 
@@ -115,7 +115,7 @@ export function CashFlowCard({
       <div className="mt-5 pt-4 border-t border-border/60 relative z-10">
         {/* Usamos grid-cols-2 o grid-cols-3 dependiendo de si hay deudas */}
         <div className={cn("grid gap-2 text-sm", hasDebts ? "grid-cols-3" : "grid-cols-2")}>
-          
+
           {/* Incomes */}
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-income/10 shrink-0">

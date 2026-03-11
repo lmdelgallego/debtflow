@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getStartAndEndDate } from '../date.utils';
 
 export interface Expense {
   id: string;
@@ -35,9 +36,12 @@ interface UpdateExpenseInput extends CreateExpenseInput {
 }
 
 /**
- * Obtiene todos los gastos del usuario autenticado (para cálculos y gráficos)
+ * Obtiene todos los gastos del usuario autenticado (para cálculos y gráficos).
+ * Si se provee `date` (formato YYYY-MM-DD), filtra por ese mes.
  */
-export async function fetchAllExpenses(): Promise<{ data: Expense[] | null; error: string | null }> {
+export async function fetchAllExpenses(
+  date?: string,
+): Promise<{ data: Expense[] | null; error: string | null }> {
   try {
     const supabase = await createClient();
 
@@ -46,11 +50,14 @@ export async function fetchAllExpenses(): Promise<{ data: Expense[] | null; erro
       return { data: null, error: 'Usuario no autenticado' };
     }
 
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false });
+    let query = supabase.from('expenses').select('*').eq('user_id', user.id);
+
+    if (date) {
+      const { startDate, endDate } = getStartAndEndDate(date);
+      query = query.gte('date', startDate).lte('date', endDate);
+    }
+
+    const { data, error } = await query.order('date', { ascending: false });
 
     if (error) {
       return { data: null, error: error.message };
@@ -67,7 +74,8 @@ export async function fetchAllExpenses(): Promise<{ data: Expense[] | null; erro
  */
 export async function fetchExpenses(
   page: number = 1,
-  pageSize: number = 10
+  pageSize: number = 20,
+  date: string = new Date().toISOString().split('T')[0]
 ): Promise<{ data: PaginatedExpenses | null; error: string | null }> {
   try {
     const supabase = await createClient();
@@ -77,11 +85,15 @@ export async function fetchExpenses(
       return { data: null, error: 'Usuario no autenticado' };
     }
 
+    const { startDate, endDate } = getStartAndEndDate(date);
+
     // Obtener total de registros
     const { count, error: countError } = await supabase
       .from('expenses')
       .select('id', { count: 'exact' })
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate);
 
     if (countError) {
       return { data: null, error: countError.message };
@@ -96,6 +108,8 @@ export async function fetchExpenses(
       .from('expenses')
       .select('*')
       .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
       .order('date', { ascending: false })
       .range(offset, offset + pageSize - 1);
 
@@ -287,7 +301,7 @@ export async function syncRecurringExpenses(): Promise<{ success: boolean; error
     // Filtrar los gastos que aún no se han copiado
     const toInsert = prevRecurring.filter(prevExp => {
       // Consideramos que ya se copió si hay uno con la misma categoría, descripción y monto literal
-      const exists = currentRecurring?.some(currExp => 
+      const exists = currentRecurring?.some(currExp =>
         currExp.category === prevExp.category &&
         currExp.description === prevExp.description &&
         currExp.amount === prevExp.amount
@@ -303,9 +317,9 @@ export async function syncRecurringExpenses(): Promise<{ success: boolean; error
       if (newDay > lastDayOfCurrentMonth) {
          newDay = lastDayOfCurrentMonth;
       }
-      
+
       const newDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
-      
+
       return {
         user_id: user.id,
         category: exp.category,
