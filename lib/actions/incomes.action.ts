@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getStartAndEndDate } from '../date.utils';
 
 export interface Income {
   id: string;
@@ -29,9 +30,12 @@ interface UpdateIncomeInput extends CreateIncomeInput {
 }
 
 /**
- * Obtiene todos los ingresos del usuario autenticado (para cálculos y gráficos)
+ * Obtiene todos los ingresos del usuario autenticado (para cálculos y gráficos).
+ * Si se provee `date` (formato YYYY-MM-DD), filtra por ese mes.
  */
-export async function fetchAllIncomes(): Promise<{ data: Income[] | null; error: string | null }> {
+export async function fetchAllIncomes(
+  date?: string,
+): Promise<{ data: Income[] | null; error: string | null }> {
   try {
     const supabase = await createClient();
 
@@ -40,11 +44,18 @@ export async function fetchAllIncomes(): Promise<{ data: Income[] | null; error:
       return { data: null, error: 'Usuario no autenticado' };
     }
 
-    const { data, error } = await supabase
-      .from('incomes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    let query = supabase.from('incomes').select('*').eq('user_id', user.id);
+
+    if (date) {
+      const { startDate, endDate } = getStartAndEndDate(date);
+      // endDate is the last day of the month (e.g. "2026-03-31"), add one day for lt comparison
+      const nextDay = new Date(endDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0];
+      query = query.gte('created_at', startDate).lt('created_at', nextDayStr);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       return { data: null, error: error.message };
@@ -57,11 +68,13 @@ export async function fetchAllIncomes(): Promise<{ data: Income[] | null; error:
 }
 
 /**
- * Obtiene los ingresos paginados del usuario autenticado
+ * Obtiene los ingresos paginados del usuario autenticado.
+ * Si se provee `date` (formato YYYY-MM-DD), filtra por ese mes.
  */
 export async function fetchIncomes(
   page: number = 1,
-  pageSize: number = 10
+  pageSize: number = 10,
+  date?: string,
 ): Promise<{ data: PaginatedIncomes | null; error: string | null }> {
   try {
     const supabase = await createClient();
@@ -71,11 +84,23 @@ export async function fetchIncomes(
       return { data: null, error: 'Usuario no autenticado' };
     }
 
+    let startDate: string | undefined;
+    let nextDayStr: string | undefined;
+
+    if (date) {
+      const range = getStartAndEndDate(date);
+      startDate = range.startDate;
+      const nextDay = new Date(range.endDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      nextDayStr = nextDay.toISOString().split('T')[0];
+    }
+
     // Obtener total de registros
-    const { count, error: countError } = await supabase
-      .from('incomes')
-      .select('id', { count: 'exact' })
-      .eq('user_id', user.id);
+    let countQuery = supabase.from('incomes').select('id', { count: 'exact' }).eq('user_id', user.id);
+    if (startDate && nextDayStr) {
+      countQuery = countQuery.gte('created_at', startDate).lt('created_at', nextDayStr);
+    }
+    const { count, error: countError } = await countQuery;
 
     if (countError) {
       return { data: null, error: countError.message };
@@ -86,12 +111,11 @@ export async function fetchIncomes(
     const offset = (page - 1) * pageSize;
 
     // Obtener datos paginados
-    const { data, error } = await supabase
-      .from('incomes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1);
+    let dataQuery = supabase.from('incomes').select('*').eq('user_id', user.id);
+    if (startDate && nextDayStr) {
+      dataQuery = dataQuery.gte('created_at', startDate).lt('created_at', nextDayStr);
+    }
+    const { data, error } = await dataQuery.order('created_at', { ascending: false }).range(offset, offset + pageSize - 1);
 
     if (error) {
       return { data: null, error: error.message };

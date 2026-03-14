@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { MonthSelector } from '@/components/ui/MonthSelector';
 import { fetchIncomes, fetchAllIncomes, deleteIncome } from '@/lib/actions/incomes.action';
 import type { Income } from '@/lib/actions/incomes.action';
 import { IncomeDialog } from '@/components/incomes/IncomeDialog';
@@ -29,11 +30,20 @@ const Incomes = () => {
   const [page, setPage] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
   const pageSize = 10;
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const selectedDateString = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-01`;
+
+  const handlePrevMonth = () =>
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+
+  const handleNextMonth = () =>
+    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
 
   // Fetch incomes (para tabla paginada)
   const loadIncomes = useCallback(async () => {
     setLoading(true);
-    const { data, error: fetchError } = await fetchIncomes(page, pageSize);
+    const { data, error: fetchError } = await fetchIncomes(page, pageSize, selectedDateString);
 
     if (fetchError) {
       addToast(fetchError, 'error');
@@ -42,12 +52,12 @@ const Incomes = () => {
       setIncomes(data.data || []);
     }
     setLoading(false);
-  }, [addToast, page, pageSize]);
+  }, [addToast, page, pageSize, selectedDateString]);
 
   // Fetch all incomes (para gráficos, estadísticas y cálculos)
   const loadAllIncomesForCharts = useCallback(async () => {
     setLoadingCharts(true);
-    const { data, error: fetchError } = await fetchAllIncomes();
+    const { data, error: fetchError } = await fetchAllIncomes(selectedDateString);
 
     if (fetchError) {
       console.error('Error fetching all incomes:', fetchError);
@@ -55,7 +65,11 @@ const Incomes = () => {
       setAllIncomes(data || []);
     }
     setLoadingCharts(false);
-  }, []);
+  }, [selectedDateString]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDateString]);
 
   useEffect(() => {
     loadIncomes();
@@ -218,9 +232,16 @@ const Incomes = () => {
           <PageHeader.Title>
             <div className="flex items-center justify-between gap-2">
               Ingresos
-              <Button onClick={openCreateDialog}>
-                <Plus size={16} />Agregar Ingreso
-              </Button>
+              <div className="flex items-center gap-3">
+                <MonthSelector
+                  selectedDate={selectedDate}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                />
+                <Button onClick={openCreateDialog}>
+                  <Plus size={16} />Agregar Ingreso
+                </Button>
+              </div>
             </div>
           </PageHeader.Title>
           <PageHeader.Description>
