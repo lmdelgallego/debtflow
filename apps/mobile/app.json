@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "DebtFlow",
+    "slug": "debtflow-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "debtflow",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.debtflow.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.debtflow.app"
+    },
+    "plugins": ["expo-router"]
+  }
+}

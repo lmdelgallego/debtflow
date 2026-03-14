@@ -6,7 +6,14 @@
       "Bash(pnpm lint:*)",
       "Bash(pnpm build:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm --filter @debtflow/web typecheck:*)",
+      "Bash(timeout 15 pnpm dev:web:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(pnpm --filter @debtflow/api typecheck:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

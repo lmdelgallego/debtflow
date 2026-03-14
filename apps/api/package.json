@@ -1,0 +1,32 @@
+{
+  "name": "@debtflow/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:prod": "node dist/main",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@debtflow/types": "workspace:*",
+    "@debtflow/utils": "workspace:*",
+    "@debtflow/validators": "workspace:*",
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
+    "@nestjs/config": "^4",
+    "@nestjs/platform-express": "^11",
+    "@supabase/supabase-js": "^2.90.1",
+    "reflect-metadata": "^0.2",
+    "rxjs": "^7"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11",
+    "@nestjs/schematics": "^11",
+    "@types/express": "^5",
+    "@types/node": "^20",
+    "typescript": "^5"
+  }
+}
