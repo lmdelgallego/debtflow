@@ -18,34 +18,64 @@ import { CashFlowCard } from '@/components/dashboard/CashFlowCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SummarySkeleton, ChartSkeleton } from '@/components/incomes/Skeletons';
 
-function buildMonthlyData(incomes: Income[], expenses: Expense[]) {
-  const months: Record<string, { ingresos: number; gastos: number }> = {};
+function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[]) {
+  const months: Record<string, { ingresos: number; gastos: number; minimos: number }> = {};
+
+  // Ensure the last 6 months are always present in the chart
+  const today = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = { ingresos: 0, gastos: 0, minimos: 0 };
+  }
 
   for (const income of incomes) {
     const d = new Date(income.created_at);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (!months[key]) months[key] = { ingresos: 0, gastos: 0 };
+    if (!months[key]) months[key] = { ingresos: 0, gastos: 0, minimos: 0 };
     months[key].ingresos += income.amount;
   }
 
   for (const expense of expenses) {
     const d = new Date(expense.date || expense.created_at);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (!months[key]) months[key] = { ingresos: 0, gastos: 0 };
+    if (!months[key]) months[key] = { ingresos: 0, gastos: 0, minimos: 0 };
     months[key].gastos += expense.amount;
   }
 
   const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-  return Object.entries(months)
-    .sort(([a], [b]) => a.localeCompare(b))
+  return Object.keys(months)
+    .sort((a, b) => a.localeCompare(b))
     .slice(-6)
-    .map(([key, val]) => {
-      const [, m] = key.split('-');
+    .map((key) => {
+      const [y, mStr] = key.split('-');
+      const year = parseInt(y);
+      const monthIndex = parseInt(mStr) - 1;
+      
+      const endOfMonth = new Date(year, monthIndex + 1, 0, 23, 59, 59);
+
+      let minimos = 0;
+      for (const debt of debts) {
+        const createdAt = new Date(debt.created_at);
+        if (createdAt <= endOfMonth) {
+          const paymentsAfter = expenses
+            .filter((e) => e.category === 'debt' && e.subcategory === debt.name)
+            .filter((e) => new Date(e.date || e.created_at) > endOfMonth)
+            .reduce((sum, e) => sum + e.amount, 0);
+
+          const pastBalance = debt.balance + paymentsAfter;
+          if (pastBalance > 0) {
+            minimos += debt.minimum_payment;
+          }
+        }
+      }
+
       return {
-        month: monthNames[parseInt(m) - 1],
-        ingresos: val.ingresos,
-        gastos: val.gastos,
+        month: monthNames[monthIndex],
+        ingresos: months[key].ingresos,
+        gastos: months[key].gastos,
+        minimos,
       };
     });
 }
@@ -191,7 +221,7 @@ const Dashboard = () => {
 
   const incomeSparkline = buildSparkline(incomes, 'created_at');
   const expenseSparkline = buildSparkline(expenses, 'date');
-  const monthlyData = buildMonthlyData(incomes, expenses);
+  const monthlyData = buildMonthlyData(incomes, expenses, debts);
 
   const hasData = incomes.length > 0 || expenses.length > 0 || debts.length > 0;
 
