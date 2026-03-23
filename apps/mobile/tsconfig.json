@@ -1,0 +1,23 @@
+{
+  "extends": "../../packages/config/typescript/react-native.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": [
+      "react",
+      "react-native",
+      "node"
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "DebtFlow",
+    "slug": "debtflow-mobile",
+    "scheme": "debtflow",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
