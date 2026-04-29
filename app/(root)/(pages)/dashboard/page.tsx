@@ -322,6 +322,17 @@ const Dashboard = () => {
     ? avalanche.recommendedPayments.reduce((sum, payment) => sum + payment.recommendedPayment, 0)
     : 0;
 
+  const monthlyBudget = calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal);
+  const dashboardNarrative = !avalanche
+    ? 'Empieza registrando tus deudas para activar recomendaciones personalizadas de pago.'
+    : avalanche.mode === 'NO_BUDGET'
+    ? `Este mes estas en alerta: tus gastos consumen tus ingresos. Recupera al menos $${Math.max(0, monthlyDebtPayments - monthlyBudget).toLocaleString('es-MX')} para volver a cubrir minimos.`
+    : avalanche.mode === 'CRISIS_NO_MINIMUMS'
+    ? `Aun faltan $${Math.max(0, avalanche.sumMinimums - monthlyBudget).toLocaleString('es-MX')} para cubrir pagos minimos. Ajusta gastos flexibles esta semana.`
+    : currentAvailableFlow >= 0
+    ? `Vas bien: cubres minimos y tienes ${currentAvailableFlow.toLocaleString('es-MX')} de flujo para acelerar tu deuda objetivo.`
+    : 'Tu flujo disponible es negativo este mes. Ajusta gastos para proteger tu plan de pago.';
+
   const incomeSparkline = buildSparkline(incomes, 'created_at');
   const expenseSparkline = buildSparkline(expenses, 'date');
   const monthlyData = buildMonthlyData(incomes, expenses, debts);
@@ -507,6 +518,11 @@ const Dashboard = () => {
             />
           </div>
 
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 animate-fade-in-up stagger-2">
+            <p className="text-[11px] uppercase tracking-wider text-primary font-semibold">Estado financiero del mes</p>
+            <p className="mt-1 text-sm text-foreground">{dashboardNarrative}</p>
+          </div>
+
           {/* ─── Zona 2: Contexto — Ingresos, Gastos y Próxima Deuda ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <SummaryCard
@@ -561,14 +577,14 @@ const Dashboard = () => {
           {avalanche && (
             <ActionPlanCard
               mode={avalanche.mode}
-              monthlyBudget={calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal)}
+              monthlyBudget={monthlyBudget}
               minimums={avalanche.sumMinimums}
               topExpenseName={topExpenses[0]?.name}
               topExpenseAmount={topExpenses[0]?.amount}
               suggestedCuts={(() => {
                 const shortfall = Math.max(
                   0,
-                  avalanche.sumMinimums - calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal),
+                  avalanche.sumMinimums - monthlyBudget,
                 );
                 if (shortfall <= 0 || topExpenseCategories.length === 0) return [];
 

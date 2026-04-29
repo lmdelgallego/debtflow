@@ -44,6 +44,7 @@ export function DebtHealthCard({
 }: DebtHealthCardProps) {
   const [scenarioDelta, setScenarioDelta] = useState(10);
   const [whatIfExtra, setWhatIfExtra] = useState(0);
+  const [timelineVisible, setTimelineVisible] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(SCENARIO_DELTA_STORAGE_KEY);
@@ -71,6 +72,11 @@ export function DebtHealthCard({
   useEffect(() => {
     window.localStorage.setItem(WHAT_IF_EXTRA_STORAGE_KEY, String(whatIfExtra));
   }, [whatIfExtra]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setTimelineVisible(true), 80);
+    return () => clearTimeout(timeout);
+  }, []);
 
   const hasProjection = totalDebt > 0 && monthlyDebtPayment > 0;
   const maxWhatIfExtra = Math.max(0, Math.floor(monthlyAvailableFlow));
@@ -105,6 +111,15 @@ export function DebtHealthCard({
   const whatIfSavedVsBase = whatIfMonths && estimatedMonths ? Math.max(0, estimatedMonths - whatIfMonths) : null;
 
   const estimatedDate = estimatedMonths ? formatEstimatedDate(estimatedMonths) : null;
+  const timelineMilestones = estimatedMonths
+    ? [
+        { label: 'Hoy', position: 0 },
+        { label: `+${Math.max(3, Math.ceil(estimatedMonths * 0.25))}m`, position: 25 },
+        { label: `+${Math.max(6, Math.ceil(estimatedMonths * 0.5))}m`, position: 50 },
+        { label: `+${Math.max(9, Math.ceil(estimatedMonths * 0.75))}m`, position: 75 },
+        { label: 'Deuda cero', position: 100 },
+      ]
+    : null;
   const lowMargin = sumMinimums > 0 && monthlyAvailableFlow >= 0 && monthlyAvailableFlow < sumMinimums * 0.2;
 
   const riskConfig =
@@ -174,6 +189,33 @@ export function DebtHealthCard({
           <p className="font-mono font-semibold">${formatCurrency(monthlyDebtPayment)}</p>
         </div>
       </div>
+
+      {timelineMilestones && (
+        <div className="mt-4 rounded-md border bg-muted/20 p-3">
+          <p className="text-xs font-medium text-muted-foreground">Ruta de meta: hoy a deuda cero</p>
+          <div className="mt-3 relative">
+            <div className="h-2 rounded-full bg-muted" />
+            <div
+              className="absolute inset-y-0 left-0 h-2 rounded-full bg-primary transition-all duration-700 ease-out"
+              style={{ width: timelineVisible ? '14%' : '0%' }}
+            />
+            {timelineMilestones.map((milestone) => (
+              <span
+                key={milestone.label}
+                className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border border-background bg-primary"
+                style={{ left: `calc(${milestone.position}% - 6px)` }}
+              />
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-5 text-[11px] text-muted-foreground">
+            {timelineMilestones.map((milestone) => (
+              <p key={`${milestone.label}-text`} className="text-center">
+                {milestone.label}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {hasProjection && (
         <div className="mt-4 rounded-md border bg-muted/20 p-3">
