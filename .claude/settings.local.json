@@ -6,7 +6,15 @@
       "Bash(pnpm lint:*)",
       "Bash(pnpm build:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(ls /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(auth\\\\\\)/)",
+      "Bash(ls /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(tabs\\\\\\)/)",
+      "Bash(cat /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(tabs\\\\\\)/index.tsx)",
+      "Bash(cat /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(tabs\\\\\\)/_layout.tsx)",
+      "Bash(cat /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(tabs\\\\\\)/settings.tsx)",
+      "Bash(cat /Users/lmdelgallego/Documents/WORKSPACES/debtflow/apps/mobile/app/\\\\\\(auth\\\\\\)/signin.tsx)",
+      "Bash(find /Users/lmdelgallego/Documents/WORKSPACES/debtflow -name vector-icons -path */node_modules/@expo/*)",
+      "Bash(pnpm --filter @debtflow/mobile typecheck)"
     ]
   }
 }

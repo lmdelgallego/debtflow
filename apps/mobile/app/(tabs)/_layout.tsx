@@ -1,4 +1,10 @@
+import { colors } from "@debtflow/design-tokens";
 import { Tabs } from "expo-router";
+import { Text } from "react-native";
+
+function TabIcon({ icon, color }: { icon: string; color: string }) {
+  return <Text style={{ fontSize: 18, color }}>{icon}</Text>;
+}
 
 export default function TabsLayout() {
   return (
@@ -6,23 +12,51 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#111216",
-          borderTopColor: "#27272a"
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 4
         },
-        tabBarActiveTintColor: "#fafafa",
-        tabBarInactiveTintColor: "#71717a"
+        tabBarActiveTintColor: colors.foreground,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarLabelStyle: {
+          fontSize: 11
+        }
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Resumen"
+          title: "Resumen",
+          tabBarIcon: ({ color }) => <TabIcon icon="⊞" color={color} />
+        }}
+      />
+      <Tabs.Screen
+        name="debts"
+        options={{
+          title: "Deudas",
+          tabBarIcon: ({ color }) => <TabIcon icon="◈" color={color} />
+        }}
+      />
+      <Tabs.Screen
+        name="incomes"
+        options={{
+          title: "Ingresos",
+          tabBarIcon: ({ color }) => <TabIcon icon="↑" color={color} />
+        }}
+      />
+      <Tabs.Screen
+        name="expenses"
+        options={{
+          title: "Gastos",
+          tabBarIcon: ({ color }) => <TabIcon icon="↓" color={color} />
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Cuenta"
+          title: "Cuenta",
+          tabBarIcon: ({ color }) => <TabIcon icon="◯" color={color} />
         }}
       />
     </Tabs>
