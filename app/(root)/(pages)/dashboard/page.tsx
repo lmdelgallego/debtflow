@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DollarSign, CreditCard, HandCoins, LayoutDashboard } from 'lucide-react';
 import { MonthSelector } from '@/components/ui/MonthSelector';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
@@ -124,6 +125,7 @@ function calculateTrend(current: number, previous: number) {
 }
 
 const Dashboard = () => {
+  const router = useRouter();
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -248,8 +250,10 @@ const Dashboard = () => {
         <EmptyState
           icon={LayoutDashboard}
           title="Tu dashboard está vacío"
-          description="Agrega tus ingresos y gastos para ver un resumen completo de tu situación financiera."
+          description="Comienza registrando tus ingresos para calcular tu flujo disponible y activar recomendaciones de pago."
           iconColorClass="text-primary"
+          actionLabel="Agregar ingreso"
+          onAction={() => router.push('/incomes')}
         />
       ) : (
         <>

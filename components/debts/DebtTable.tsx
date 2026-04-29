@@ -24,6 +24,7 @@ interface DebtTableProps {
   onEdit: (debt: Debt) => void;
   onPay: (debt: Debt) => void;
   onDelete: (id: string) => Promise<void>;
+  onCreate: () => void;
 }
 
 function MobileDebtCard({ debt, onEdit, onPay, onDelete }: { debt: Debt; onEdit: (debt: Debt) => void; onPay: (debt: Debt) => void; onDelete: (id: string) => Promise<void> }) {
@@ -70,6 +71,7 @@ export function DebtTable({
   onEdit,
   onPay,
   onDelete,
+  onCreate,
 }: DebtTableProps) {
   const totalBalance = filteredDebts.reduce((sum, d) => sum + d.balance, 0);
   const totalMinimum = filteredDebts.reduce((sum, d) => sum + d.minimum_payment, 0);
@@ -85,6 +87,8 @@ export function DebtTable({
           title="Sin deudas registradas"
           description="Comienza agregando tu primera deuda para ver el resumen y las recomendaciones de pago."
           iconColorClass="text-debt"
+          actionLabel="Agregar deuda"
+          onAction={onCreate}
         />
       ) : filteredDebts.length === 0 ? (
         <EmptyState

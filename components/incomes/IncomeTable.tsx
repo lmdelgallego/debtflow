@@ -25,6 +25,7 @@ interface IncomeTableProps {
   filteredVariableTotal: number;
   onEdit: (income: Income) => void;
   onDelete: (id: string) => Promise<void>;
+  onCreate: () => void;
 }
 
 function MobileIncomeCard({ income, onEdit, onDelete }: { income: Income; onEdit: (income: Income) => void; onDelete: (id: string) => Promise<void> }) {
@@ -73,6 +74,7 @@ export function IncomeTable({
   filteredVariableTotal,
   onEdit,
   onDelete,
+  onCreate,
 }: IncomeTableProps) {
   return (
     <Card className="p-6">
@@ -85,6 +87,8 @@ export function IncomeTable({
           title="Sin ingresos registrados"
           description="Comienza agregando tu primer ingreso para ver el resumen y las estadísticas de tu flujo financiero."
           iconColorClass="text-income"
+          actionLabel="Agregar ingreso"
+          onAction={onCreate}
         />
       ) : filteredIncomes.length === 0 ? (
         <EmptyState

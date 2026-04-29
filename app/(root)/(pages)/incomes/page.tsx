@@ -305,6 +305,7 @@ const Incomes = () => {
             filteredVariableTotal={filteredVariableTotal}
             onEdit={openEditDialog}
             onDelete={handleDeleteIncome}
+            onCreate={openCreateDialog}
           />
         )}
 

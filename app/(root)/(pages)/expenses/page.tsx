@@ -270,6 +270,7 @@ const ExpensesPage = () => {
           loading={loading}
           onEdit={openEditDialog}
           onDelete={handleDeleteExpense}
+          onCreate={openCreateDialog}
         />
       )}
 

@@ -198,6 +198,7 @@ const Debts = () => {
           onEdit={openEditDialog}
           onPay={openPayDialog}
           onDelete={handleDeleteDebt}
+          onCreate={openCreateDialog}
         />
       )}
 

@@ -23,6 +23,7 @@ interface ExpenseTableProps {
   loading: boolean;
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
+  onCreate: () => void;
 }
 
 function MobileExpenseCard({ expense, onEdit, onDelete }: { expense: Expense; onEdit: (expense: Expense) => void; onDelete: (id: string) => void }) {
@@ -56,7 +57,7 @@ function MobileExpenseCard({ expense, onEdit, onDelete }: { expense: Expense; on
   );
 }
 
-export function ExpenseTable({ expenses, loading, onEdit, onDelete }: ExpenseTableProps) {
+export function ExpenseTable({ expenses, loading, onEdit, onDelete, onCreate }: ExpenseTableProps) {
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   return (
@@ -70,6 +71,8 @@ export function ExpenseTable({ expenses, loading, onEdit, onDelete }: ExpenseTab
           title="Sin gastos registrados"
           description="Agrega tu primer gasto para comenzar a visualizar tus estadísticas y mantener el control de tus finanzas."
           iconColorClass="text-expense"
+          actionLabel="Agregar gasto"
+          onAction={onCreate}
         />
       ) : (
         <>
