@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { DollarSign, CreditCard, HandCoins, LayoutDashboard } from 'lucide-react';
+import { DollarSign, CreditCard, HandCoins, LayoutDashboard, CheckCircle2 } from 'lucide-react';
 import { MonthSelector } from '@/components/ui/MonthSelector';
+import { Button } from '@/components/ui/button';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses, syncRecurringExpenses } from '@/lib/actions/expenses.action';
 import { fetchAllDebts } from '@/lib/actions/debts.action';
+import { getCategoryByValue } from '@/constants/expense-categories';
 import type { Income } from '@/lib/actions/incomes.action';
 import type { Expense } from '@/lib/actions/expenses.action';
 import type { Debt } from '@/lib/actions/debts.action';
@@ -18,11 +20,50 @@ import { NextDebtCard } from '@/components/dashboard/NextDebtCard';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
 import { CashFlowCard } from '@/components/dashboard/CashFlowCard';
 import { DebtHealthCard } from '@/components/dashboard/DebtHealthCard';
+import { ActionPlanCard } from '@/components/dashboard/ActionPlanCard';
+import { MonthCloseDialog } from '@/components/dashboard/MonthCloseDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { useToast } from '@/components/ui/Toast';
 import { SummarySkeleton, ChartSkeleton } from '@/components/incomes/Skeletons';
 
 const ONBOARDING_STORAGE_KEY = 'debtflow_onboarding_completed_v1';
+const MONTH_CLOSURES_STORAGE_KEY = 'debtflow_month_closures_v1';
+const BLOCKED_CUT_CATEGORIES_STORAGE_KEY = 'debtflow_blocked_cut_categories_v1';
+
+interface MonthClosureSnapshot {
+  monthKey: string;
+  monthLabel: string;
+  incomes: number;
+  expenses: number;
+  minimums: number;
+  availableFlow: number;
+  totalDebt: number;
+  activeDebts: number;
+  closedAt: string;
+}
+
+const CATEGORY_CUT_PRIORITY: Record<string, number> = {
+  entertainment: 5,
+  others: 5,
+  transport: 4,
+  food: 3,
+  utilities: 2,
+  housing: 1,
+  health: 1,
+  debt: 0,
+};
+
+function getFlexibilityLabel(priority: number): 'Alta' | 'Media' | 'Baja' {
+  if (priority >= 5) return 'Alta';
+  if (priority >= 3) return 'Media';
+  return 'Baja';
+}
+
+function formatDelta(value: number) {
+  const abs = Math.abs(value).toLocaleString('es-MX', { maximumFractionDigits: 0 });
+  return `${value >= 0 ? '+' : '-'}$${abs}`;
+}
 
 function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[]) {
   const months: Record<string, { ingresos: number; gastos: number; minimos: number }> = {};
@@ -131,12 +172,16 @@ function calculateTrend(current: number, previous: number) {
 
 const Dashboard = () => {
   const router = useRouter();
+  const { addToast } = useToast();
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showMonthCloseDialog, setShowMonthCloseDialog] = useState(false);
+  const [monthClosures, setMonthClosures] = useState<Record<string, MonthClosureSnapshot>>({});
+  const [blockedCutCategories, setBlockedCutCategories] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,6 +206,27 @@ const Dashboard = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const rawBlocked = window.localStorage.getItem(BLOCKED_CUT_CATEGORIES_STORAGE_KEY);
+    if (!rawBlocked) return;
+
+    try {
+      const parsed = JSON.parse(rawBlocked) as string[];
+      setBlockedCutCategories(parsed);
+    } catch {
+      setBlockedCutCategories([]);
+    }
+  }, []);
+
+  const handleToggleBlockedCutCategory = (categoryValue: string) => {
+    const updated = blockedCutCategories.includes(categoryValue)
+      ? blockedCutCategories.filter((value) => value !== categoryValue)
+      : [...blockedCutCategories, categoryValue];
+
+    setBlockedCutCategories(updated);
+    window.localStorage.setItem(BLOCKED_CUT_CATEGORIES_STORAGE_KEY, JSON.stringify(updated));
+  };
 
   const handlePrevMonth = () => {
     setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -212,6 +278,7 @@ const Dashboard = () => {
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
   ];
   const monthLabel = `${MONTH_NAMES_ES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+  const monthKey = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
 
 
   // ── Top 3 items ──────────────────────────────────────────────────────────
@@ -225,6 +292,30 @@ const Dashboard = () => {
     .slice(0, 3)
     .map(e => ({ name: e.description || e.category, amount: e.amount }));
 
+  const nonDebtExpenses = currentMonthExpenses.filter((expense) => expense.category !== 'debt');
+  const expensesByCategory = nonDebtExpenses.reduce<Record<string, number>>((acc, expense) => {
+    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+    return acc;
+  }, {});
+  const topExpenseCategories = Object.entries(expensesByCategory)
+    .sort(([categoryA, amountA], [categoryB, amountB]) => {
+      const priorityA = CATEGORY_CUT_PRIORITY[categoryA] ?? 2;
+      const priorityB = CATEGORY_CUT_PRIORITY[categoryB] ?? 2;
+      if (priorityB !== priorityA) {
+        return priorityB - priorityA;
+      }
+      return amountB - amountA;
+    })
+    .slice(0, 3)
+    .map(([categoryValue, amount]) => {
+      const category = getCategoryByValue(categoryValue);
+      return {
+        value: categoryValue,
+        name: category?.label || categoryValue,
+        amount,
+      };
+    });
+
   const avalanche: AvalancheResult | null =
     activeDebts.length > 0 ? calculateAvalanche(debts, totalIncomes, totalExpenses) : null;
   const projectedDebtPayment = avalanche
@@ -236,6 +327,25 @@ const Dashboard = () => {
   const monthlyData = buildMonthlyData(incomes, expenses, debts);
 
   const hasData = incomes.length > 0 || expenses.length > 0 || debts.length > 0;
+  const isMonthClosed = !!monthClosures[monthKey];
+  const sortedClosureKeys = Object.keys(monthClosures).sort((a, b) => a.localeCompare(b));
+  const latestClosureKey = sortedClosureKeys[sortedClosureKeys.length - 1];
+  const previousClosureKey = sortedClosureKeys[sortedClosureKeys.length - 2];
+  const latestClosure = latestClosureKey ? monthClosures[latestClosureKey] : null;
+  const previousClosure = previousClosureKey ? monthClosures[previousClosureKey] : null;
+  const recentClosures = sortedClosureKeys.slice(-3).reverse().map((key) => monthClosures[key]);
+  const recentFlowValues = recentClosures.map((closure) => closure.availableFlow);
+  const maxAbsRecentFlow = recentFlowValues.length > 0
+    ? Math.max(...recentFlowValues.map((value) => Math.abs(value)), 1)
+    : 1;
+
+  const closureDelta = latestClosure && previousClosure
+    ? {
+        flow: latestClosure.availableFlow - previousClosure.availableFlow,
+        expenses: latestClosure.expenses - previousClosure.expenses,
+        debt: latestClosure.totalDebt - previousClosure.totalDebt,
+      }
+    : null;
 
   useEffect(() => {
     if (loading || hasData) return;
@@ -265,6 +375,48 @@ const Dashboard = () => {
     window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
   };
 
+  useEffect(() => {
+    const rawClosures = window.localStorage.getItem(MONTH_CLOSURES_STORAGE_KEY);
+    if (!rawClosures) return;
+
+    try {
+      const parsed = JSON.parse(rawClosures) as Record<string, MonthClosureSnapshot>;
+      setMonthClosures(parsed);
+    } catch {
+      setMonthClosures({});
+    }
+  }, []);
+
+  const handleCloseMonth = () => {
+    if (isMonthClosed) {
+      setShowMonthCloseDialog(false);
+      return;
+    }
+
+    const snapshot: MonthClosureSnapshot = {
+      monthKey,
+      monthLabel,
+      incomes: monthlyIncomeTotal,
+      expenses: monthlyExpenseTotal,
+      minimums: monthlyDebtPayments,
+      availableFlow: currentAvailableFlow,
+      totalDebt,
+      activeDebts: activeDebts.length,
+      closedAt: new Date().toISOString(),
+    };
+
+    const updatedClosures = {
+      ...monthClosures,
+      [monthKey]: snapshot,
+    };
+
+    window.localStorage.setItem(MONTH_CLOSURES_STORAGE_KEY, JSON.stringify(updatedClosures));
+    setMonthClosures(updatedClosures);
+    setShowMonthCloseDialog(false);
+    setSelectedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    addToast(`Mes cerrado: ${monthLabel}. Ahora estas viendo el siguiente mes.`, 'success');
+  };
+
   return (
     <>
       <OnboardingWizard
@@ -277,16 +429,39 @@ const Dashboard = () => {
           hasDebts: debts.length > 0,
         }}
       />
+      <MonthCloseDialog
+        open={showMonthCloseDialog}
+        onOpenChange={setShowMonthCloseDialog}
+        onConfirm={handleCloseMonth}
+        monthLabel={monthLabel}
+        incomes={monthlyIncomeTotal}
+        expenses={monthlyExpenseTotal}
+        minimums={monthlyDebtPayments}
+        availableFlow={currentAvailableFlow}
+        activeDebts={activeDebts.length}
+        alreadyClosed={isMonthClosed}
+      />
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 animate-fade-in mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Resumen Financiero</h1>
           <p className="text-muted-foreground text-sm">Vista general de tu situación financiera actual.</p>
         </div>
-        <MonthSelector
-          selectedDate={selectedDate}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-        />
+        <div className="flex items-center gap-2">
+          <MonthSelector
+            selectedDate={selectedDate}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
+          />
+          <Button
+            variant={isMonthClosed ? 'outline' : 'default'}
+            className="gap-1"
+            onClick={() => setShowMonthCloseDialog(true)}
+            disabled={!hasData}
+          >
+            {isMonthClosed ? <CheckCircle2 size={15} /> : null}
+            {isMonthClosed ? 'Mes cerrado' : 'Cerrar mes'}
+          </Button>
+        </div>
       </header>
 
       {loading ? (
@@ -381,6 +556,169 @@ const Dashboard = () => {
               sumMinimums={avalanche.sumMinimums}
               weightedInterestRateAnnual={weightedInterestRateAnnual}
             />
+          )}
+
+          {avalanche && (
+            <ActionPlanCard
+              mode={avalanche.mode}
+              monthlyBudget={calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal)}
+              minimums={avalanche.sumMinimums}
+              topExpenseName={topExpenses[0]?.name}
+              topExpenseAmount={topExpenses[0]?.amount}
+              suggestedCuts={(() => {
+                const shortfall = Math.max(
+                  0,
+                  avalanche.sumMinimums - calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal),
+                );
+                if (shortfall <= 0 || topExpenseCategories.length === 0) return [];
+
+                const eligibleCategories = topExpenseCategories.filter(
+                  (category) => !blockedCutCategories.includes(category.value),
+                );
+                if (eligibleCategories.length === 0) return [];
+
+                let remaining = shortfall;
+                const initialPlan = eligibleCategories
+                  .map((category) => {
+                    const priority = CATEGORY_CUT_PRIORITY[category.value] ?? 2;
+                    const maxSuggestedByCategory = Math.ceil(category.amount * 0.35);
+                    const targetChunk = Math.ceil(remaining / Math.max(1, eligibleCategories.length));
+                    const suggestedAmount = Math.min(category.amount, maxSuggestedByCategory, targetChunk);
+                    remaining = Math.max(0, remaining - suggestedAmount);
+                    return {
+                      value: category.value,
+                      name: category.name,
+                      suggestedAmount,
+                      flexibility: getFlexibilityLabel(priority),
+                    };
+                  })
+                  .filter((item) => item.suggestedAmount > 0);
+
+                if (remaining <= 0) {
+                  return initialPlan;
+                }
+
+                return initialPlan.map((item) => {
+                  if (remaining <= 0) return item;
+                  const sourceCategory = eligibleCategories.find((category) => category.name === item.name);
+                  if (!sourceCategory) return item;
+
+                  const maxExtra = Math.max(0, sourceCategory.amount - item.suggestedAmount);
+                  if (maxExtra <= 0) return item;
+
+                  const add = Math.min(maxExtra, remaining);
+                  remaining -= add;
+                  return {
+                    ...item,
+                    suggestedAmount: item.suggestedAmount + add,
+                  };
+                });
+              })()}
+              cutCategories={topExpenseCategories.map((category) => ({
+                value: category.value,
+                name: category.name,
+              }))}
+              blockedCutCategories={blockedCutCategories}
+              onToggleBlockedCategory={handleToggleBlockedCutCategory}
+              onGoIncomes={() => router.push('/incomes')}
+              onGoExpenses={() => router.push('/expenses')}
+              onGoDebts={() => router.push('/debts')}
+            />
+          )}
+
+          {latestClosure && (
+            <div className="rounded-lg border bg-card p-4 animate-fade-in-up stagger-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold">Ultimo cierre mensual</p>
+                  <p className="text-xs text-muted-foreground">
+                    {latestClosure.monthLabel} · cerrado el {new Date(latestClosure.closedAt).toLocaleDateString('es-MX')}
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                  Snapshot
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                <div className="rounded-md bg-muted/40 p-2.5">
+                  <p className="text-[11px] text-muted-foreground">Flujo</p>
+                  <p className={`font-mono font-semibold ${latestClosure.availableFlow >= 0 ? 'text-income' : 'text-expense'}`}>
+                    {formatDelta(latestClosure.availableFlow)}
+                  </p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2.5">
+                  <p className="text-[11px] text-muted-foreground">Gastos</p>
+                  <p className="font-mono font-semibold text-expense">${latestClosure.expenses.toLocaleString('es-MX')}</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2.5">
+                  <p className="text-[11px] text-muted-foreground">Deuda total</p>
+                  <p className="font-mono font-semibold text-debt">${latestClosure.totalDebt.toLocaleString('es-MX')}</p>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2.5">
+                  <p className="text-[11px] text-muted-foreground">Deudas activas</p>
+                  <p className="font-semibold">{latestClosure.activeDebts}</p>
+                </div>
+              </div>
+
+              {closureDelta && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Vs cierre anterior: flujo {formatDelta(closureDelta.flow)} · gastos {formatDelta(closureDelta.expenses)} · deuda {formatDelta(closureDelta.debt)}
+                </p>
+              )}
+
+              {recentClosures.length > 1 && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Tendencia ultimos 3 cierres</p>
+                  <div className="space-y-2">
+                    {recentClosures.map((closure) => (
+                      <div key={closure.monthKey} className="grid grid-cols-4 gap-2 text-xs">
+                        <p className="font-medium truncate">{closure.monthLabel}</p>
+                        <p className={`${closure.availableFlow >= 0 ? 'text-income' : 'text-expense'} font-mono`}>
+                          {formatDelta(closure.availableFlow)}
+                        </p>
+                        <p className="font-mono text-expense">-${closure.expenses.toLocaleString('es-MX')}</p>
+                        <p className="font-mono text-debt">${closure.totalDebt.toLocaleString('es-MX')}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {recentClosures.map((closure) => {
+                      const width = Math.max(8, Math.round((Math.abs(closure.availableFlow) / maxAbsRecentFlow) * 100));
+                      const isSelectedClosureMonth = closure.monthKey === monthKey;
+                      return (
+                        <button
+                          key={`${closure.monthKey}-flowbar`}
+                          type="button"
+                          className={`flex w-full items-center gap-2 rounded-md px-1 py-1 transition-colors ${
+                            isSelectedClosureMonth
+                              ? 'bg-primary/10 ring-1 ring-primary/30'
+                              : 'hover:bg-muted/50'
+                          }`}
+                          onClick={() => {
+                            const [year, month] = closure.monthKey.split('-').map(Number);
+                            setSelectedDate(new Date(year, month - 1, 1));
+                          }}
+                          aria-label={`Ir a ${closure.monthLabel}`}
+                          aria-pressed={isSelectedClosureMonth}
+                        >
+                          <span className={`w-12 text-[11px] truncate ${isSelectedClosureMonth ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                            {closure.monthLabel.split(' ')[0]}
+                          </span>
+                          <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${closure.availableFlow >= 0 ? 'bg-income' : 'bg-expense'}`}
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">Columnas: Mes · Flujo · Gastos · Deuda · Toca una fila para ir a ese mes</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* ─── Zona 3: Histórico mensual ─── */}
