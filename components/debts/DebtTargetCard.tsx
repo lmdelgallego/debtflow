@@ -15,7 +15,13 @@ import {
   Infinity as InfinityIcon,
 } from 'lucide-react';
 import type { Debt } from '@/lib/actions/debts.action';
-import { projectSingleDebt, formatMonths, formatPayoffDate } from '@/lib/payoff';
+import {
+  calculateMonthlyBudget,
+  determineBudgetHealthMode,
+  projectSingleDebt,
+  formatMonths,
+  formatPayoffDate,
+} from '@/lib/payoff';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +33,7 @@ interface TargetResult {
   totalDebts: number;
   extraBudget: number;
   recommendedPayment: number;
-  mode: 'NORMAL' | 'CRISIS' | 'NO_BUDGET';
+  mode: 'NORMAL' | 'CRISIS_NO_MINIMUMS' | 'NO_BUDGET';
 }
 
 // ─── Logic ──────────────────────────────────────────────────────────────────
@@ -54,19 +60,16 @@ function computeTarget(
             : b.interest_rate - a.interest_rate,
         );
 
-  const budget = Math.max(0, totalIncome - totalExpenses);
+  const budget = calculateMonthlyBudget(totalIncome, totalExpenses);
   const sumMinimums = sorted.reduce((s, d) => s + d.minimum_payment, 0);
 
-  let mode: TargetResult['mode'];
-  if (budget === 0) mode = 'NO_BUDGET';
-  else if (budget < sumMinimums) mode = 'CRISIS';
-  else mode = 'NORMAL';
+  const mode = determineBudgetHealthMode(budget, sumMinimums);
 
   const extra = mode === 'NORMAL' ? budget - sumMinimums : 0;
   const recommendedPayment =
     mode === 'NORMAL'
       ? sorted[0].minimum_payment + extra
-      : mode === 'CRISIS'
+      : mode === 'CRISIS_NO_MINIMUMS'
       ? Math.min(
           sorted[0].balance,
           Math.round((budget * (sorted[0].minimum_payment / sumMinimums)) * 100) / 100,
@@ -322,7 +325,7 @@ export function DebtTargetCard({
                 <span>Sin presupuesto disponible — tus gastos igualan o superan tus ingresos.</span>
               </div>
             )}
-            {result.mode === 'CRISIS' && (
+            {result.mode === 'CRISIS_NO_MINIMUMS' && (
               <div className="mt-3 flex items-start gap-2 rounded-md border border-expense/20 bg-expense/10 px-3 py-2.5 text-xs text-expense">
                 <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                 <span>Tu flujo no cubre todos los mínimos. Reduce gastos para atacar esta deuda.</span>

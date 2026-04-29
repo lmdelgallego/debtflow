@@ -12,12 +12,17 @@ import type { Expense } from '@/lib/actions/expenses.action';
 import type { Debt } from '@/lib/actions/debts.action';
 import { calculateAvalanche } from '@/lib/avalanche';
 import type { AvalancheResult } from '@/lib/avalanche';
+import { calculateMonthlyBudget, calculateWeightedInterestRate } from '@/lib/payoff';
 import { SummaryCard } from '@/components/dashboard/SummaryCard';
 import { NextDebtCard } from '@/components/dashboard/NextDebtCard';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
 import { CashFlowCard } from '@/components/dashboard/CashFlowCard';
+import { DebtHealthCard } from '@/components/dashboard/DebtHealthCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { SummarySkeleton, ChartSkeleton } from '@/components/incomes/Skeletons';
+
+const ONBOARDING_STORAGE_KEY = 'debtflow_onboarding_completed_v1';
 
 function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[]) {
   const months: Record<string, { ingresos: number; gastos: number; minimos: number }> = {};
@@ -53,7 +58,7 @@ function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[])
       const [y, mStr] = key.split('-');
       const year = parseInt(y);
       const monthIndex = parseInt(mStr) - 1;
-      
+
       const endOfMonth = new Date(year, monthIndex + 1, 0, 23, 59, 59);
 
       let minimos = 0;
@@ -131,6 +136,7 @@ const Dashboard = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showOnboarding, setShowOnboarding] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +174,7 @@ const Dashboard = () => {
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const activeDebts = debts.filter((d) => d.balance > 0);
   const totalDebt = activeDebts.reduce((s, d) => s + d.balance, 0);
+  const weightedInterestRateAnnual = calculateWeightedInterestRate(activeDebts);
 
   // ── Monthly cash flow (selected month) ─────────────────────────────
   const currentMonthIncomes = filterByMonth(incomes, selectedDate, 'created_at');
@@ -181,11 +188,11 @@ const Dashboard = () => {
   const prevMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
   const prevMonthIncomes = filterByMonth(incomes, prevMonthDate, 'created_at');
   const prevMonthExpenses = filterByMonth(expenses, prevMonthDate, 'date');
-  
+
   const prevMonthlyIncomeTotal = prevMonthIncomes.reduce((s, i) => s + i.amount, 0);
   const prevMonthlyExpenseTotal = prevMonthExpenses.reduce((s, e) => s + e.amount, 0);
-  const prevAvailableFlow = prevMonthlyIncomeTotal - prevMonthlyExpenseTotal - monthlyDebtPayments;
-  const currentAvailableFlow = monthlyIncomeTotal - monthlyExpenseTotal - monthlyDebtPayments;
+  const prevAvailableFlow = calculateMonthlyBudget(prevMonthlyIncomeTotal, prevMonthlyExpenseTotal) - monthlyDebtPayments;
+  const currentAvailableFlow = calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal) - monthlyDebtPayments;
 
   const incomeTrend = {
     ...calculateTrend(monthlyIncomeTotal, prevMonthlyIncomeTotal),
@@ -220,6 +227,9 @@ const Dashboard = () => {
 
   const avalanche: AvalancheResult | null =
     activeDebts.length > 0 ? calculateAvalanche(debts, totalIncomes, totalExpenses) : null;
+  const projectedDebtPayment = avalanche
+    ? avalanche.recommendedPayments.reduce((sum, payment) => sum + payment.recommendedPayment, 0)
+    : 0;
 
   const incomeSparkline = buildSparkline(incomes, 'created_at');
   const expenseSparkline = buildSparkline(expenses, 'date');
@@ -227,8 +237,46 @@ const Dashboard = () => {
 
   const hasData = incomes.length > 0 || expenses.length > 0 || debts.length > 0;
 
+  useEffect(() => {
+    if (loading || hasData) return;
+    const onboardingCompleted = window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+    if (!onboardingCompleted) {
+      setShowOnboarding(true);
+    }
+  }, [loading, hasData]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const hasCompletedDataSetup = incomes.length > 0 && expenses.length > 0 && debts.length > 0;
+    if (!hasCompletedDataSetup) return;
+
+    const onboardingCompleted = window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
+    if (!onboardingCompleted) {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+    }
+
+    if (showOnboarding) {
+      setShowOnboarding(false);
+    }
+  }, [loading, incomes.length, expenses.length, debts.length, showOnboarding]);
+
+  const handleOnboardingComplete = () => {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+  };
+
   return (
     <>
+      <OnboardingWizard
+        open={showOnboarding}
+        onOpenChange={setShowOnboarding}
+        onComplete={handleOnboardingComplete}
+        checklist={{
+          hasIncomes: incomes.length > 0,
+          hasExpenses: expenses.length > 0,
+          hasDebts: debts.length > 0,
+        }}
+      />
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 animate-fade-in mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Resumen Financiero</h1>
@@ -323,6 +371,17 @@ const Dashboard = () => {
               />
             )}
           </div>
+
+          {avalanche && activeDebts.length > 0 && (
+            <DebtHealthCard
+              mode={avalanche.mode}
+              totalDebt={totalDebt}
+              monthlyDebtPayment={projectedDebtPayment}
+              monthlyAvailableFlow={currentAvailableFlow}
+              sumMinimums={avalanche.sumMinimums}
+              weightedInterestRateAnnual={weightedInterestRateAnnual}
+            />
+          )}
 
           {/* ─── Zona 3: Histórico mensual ─── */}
           {monthlyData.length > 0 && <CashFlowChart data={monthlyData} />}

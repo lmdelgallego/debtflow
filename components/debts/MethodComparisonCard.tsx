@@ -13,7 +13,7 @@ import {
   Banknote,
 } from 'lucide-react';
 import type { Debt } from '@/lib/actions/debts.action';
-import { compareMethodsPayoff, formatMonths, formatPayoffDate } from '@/lib/payoff';
+import { calculateMonthlyBudget, compareMethodsPayoff, formatMonths, formatPayoffDate } from '@/lib/payoff';
 import type { PortfolioProjection } from '@/lib/payoff';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export function MethodComparisonCard({
   totalIncome = 0,
   totalExpenses = 0,
 }: MethodComparisonCardProps) {
-  const monthlyBudget = Math.max(0, totalIncome - totalExpenses);
+  const monthlyBudget = calculateMonthlyBudget(totalIncome, totalExpenses);
 
   const comparison = useMemo(
     () => compareMethodsPayoff(debts, monthlyBudget),
