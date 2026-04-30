@@ -3,13 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Coins, Calculator } from 'lucide-react';
+import { Plus, Search, Calculator } from 'lucide-react';
 import { fetchDebts, fetchAllDebts, deleteDebt } from '@/lib/actions/debts.action';
 import type { Debt } from '@/lib/actions/debts.action';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses } from '@/lib/actions/expenses.action';
 import { DebtDialog } from '@/components/debts/DebtDialog';
-import { PayDebtDialog } from '@/components/debts/PayDebtDialog';
 import { DebtSummaryCards } from '@/components/debts/DebtSummaryCards';
 import { DebtTargetCard } from '@/components/debts/DebtTargetCard';
 import { MethodComparisonCard } from '@/components/debts/MethodComparisonCard';
@@ -28,21 +27,18 @@ const Debts = () => {
   const [loading, setLoading] = useState(true);
   const [loadingAll, setLoadingAll] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
-  const [payingDebt, setPayingDebt] = useState<Debt | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page] = useState(1);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
-  const [activeMobileSection, setActiveMobileSection] = useState<'add' | 'pay' | 'simulate'>('add');
+  const [activeMobileSection, setActiveMobileSection] = useState<'add' | 'simulate'>('add');
   const pageSize = 10;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const sectionMap: Array<{ id: string; action: 'add' | 'pay' | 'simulate' }> = [
+    const sectionMap: Array<{ id: string; action: 'add' | 'simulate' }> = [
       { id: 'listado-deudas', action: 'add' },
-      { id: 'objetivo-deuda', action: 'pay' },
       { id: 'simular-deudas', action: 'simulate' },
     ];
 
@@ -118,11 +114,6 @@ const Debts = () => {
   const openEditDialog = (debt: Debt) => {
     setEditingDebt(debt);
     setDialogOpen(true);
-  };
-
-  const openPayDialog = (debt: Debt) => {
-    setPayingDebt(debt);
-    setPayDialogOpen(true);
   };
 
   const handleDialogSuccess = () => {
@@ -236,7 +227,6 @@ const Debts = () => {
             loading={loading}
             filteredDebts={filteredDebts}
             onEdit={openEditDialog}
-            onPay={openPayDialog}
             onDelete={handleDeleteDebt}
             onCreate={openCreateDialog}
           />
@@ -248,14 +238,6 @@ const Debts = () => {
         debt={editingDebt}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={handleDialogSuccess}
-      />
-
-      {/* Pay Debt Dialog */}
-      <PayDebtDialog
-        debt={payingDebt}
-        open={payDialogOpen}
-        onOpenChange={setPayDialogOpen}
         onSuccess={handleDialogSuccess}
       />
 
@@ -273,7 +255,7 @@ const Debts = () => {
 
       <div className="sm:hidden fixed bottom-3 inset-x-0 z-40 px-4">
         <div className="mx-auto max-w-md rounded-xl border border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-2 shadow-lg">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               className={`h-9 text-xs transition-all duration-200 ${activeMobileSection === 'add' ? 'scale-[1.02] shadow-sm' : ''}`}
               variant={activeMobileSection === 'add' ? 'default' : 'outline'}
@@ -281,20 +263,6 @@ const Debts = () => {
             >
               <Plus size={14} />
               Agregar
-            </Button>
-            <Button
-              className={`h-9 text-xs transition-all duration-200 ${activeMobileSection === 'pay' ? 'scale-[1.02] shadow-sm' : ''}`}
-              variant={activeMobileSection === 'pay' ? 'default' : 'outline'}
-              onClick={() => {
-                if (activeDebts.length > 0) {
-                  openPayDialog(activeDebts[0]);
-                } else {
-                  addToast('Primero agrega una deuda activa para registrar pago', 'warning');
-                }
-              }}
-            >
-              <Coins size={14} />
-              Registrar pago
             </Button>
             <Button
               className={`h-9 text-xs transition-all duration-200 ${activeMobileSection === 'simulate' ? 'scale-[1.02] shadow-sm' : ''}`}

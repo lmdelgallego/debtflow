@@ -23,6 +23,16 @@ interface DebtHealthCardProps {
   monthlyAvailableFlow: number;
   sumMinimums: number;
   weightedInterestRateAnnual: number;
+  liquidityFloor: number;
+  autoLiquidityFloor: number;
+  basePortfolioMonths: number | null;
+  optimisticPortfolioMonths: number | null;
+  conservativePortfolioMonths: number | null;
+  variableIncomeDeltaPct: number;
+  onVariableIncomeDeltaChange: (value: number) => void;
+  liquidityFloorMode: 'auto' | 'manual';
+  onLiquidityFloorModeChange: (mode: 'auto' | 'manual') => void;
+  onManualLiquidityFloorChange: (value: number) => void;
 }
 
 function formatCurrency(value: number) {
@@ -41,6 +51,16 @@ export function DebtHealthCard({
   monthlyAvailableFlow,
   sumMinimums,
   weightedInterestRateAnnual,
+  liquidityFloor,
+  autoLiquidityFloor,
+  basePortfolioMonths,
+  optimisticPortfolioMonths,
+  conservativePortfolioMonths,
+  variableIncomeDeltaPct,
+  onVariableIncomeDeltaChange,
+  liquidityFloorMode,
+  onLiquidityFloorModeChange,
+  onManualLiquidityFloorChange,
 }: DebtHealthCardProps) {
   const [scenarioDelta, setScenarioDelta] = useState(10);
   const [whatIfExtra, setWhatIfExtra] = useState(0);
@@ -79,7 +99,7 @@ export function DebtHealthCard({
   }, []);
 
   const hasProjection = totalDebt > 0 && monthlyDebtPayment > 0;
-  const maxWhatIfExtra = Math.max(0, Math.floor(monthlyAvailableFlow));
+  const maxWhatIfExtra = Math.max(0, Math.floor(monthlyAvailableFlow - liquidityFloor));
   const clampedWhatIfExtra = Math.min(Math.max(whatIfExtra, 0), maxWhatIfExtra);
   const monthlyRate = Math.max(0, weightedInterestRateAnnual) / 100 / 12;
   const estimatedMonths = hasProjection
@@ -110,7 +130,11 @@ export function DebtHealthCard({
     : null;
   const whatIfSavedVsBase = whatIfMonths && estimatedMonths ? Math.max(0, estimatedMonths - whatIfMonths) : null;
 
-  const estimatedDate = estimatedMonths ? formatEstimatedDate(estimatedMonths) : null;
+  const estimatedDate = basePortfolioMonths
+    ? formatEstimatedDate(basePortfolioMonths)
+    : estimatedMonths
+    ? formatEstimatedDate(estimatedMonths)
+    : null;
   const timelineMilestones = estimatedMonths
     ? [
         { label: 'Hoy', position: 0 },
@@ -163,9 +187,9 @@ export function DebtHealthCard({
           ) : (
             <p className="mt-1 text-lg font-semibold text-muted-foreground">Sin proyeccion disponible</p>
           )}
-          {estimatedMonths && (
+          {(basePortfolioMonths || estimatedMonths) && (
             <p className="text-xs text-muted-foreground">
-              Aproximadamente {estimatedMonths} mes{estimatedMonths === 1 ? '' : 'es'} al ritmo actual.
+              Aproximadamente {(basePortfolioMonths || estimatedMonths)} mes{(basePortfolioMonths || estimatedMonths) === 1 ? '' : 'es'} al ritmo actual.
             </p>
           )}
           {estimatedMonths && monthlyRate > 0 && (
@@ -219,6 +243,112 @@ export function DebtHealthCard({
 
       {hasProjection && (
         <div className="mt-4 rounded-md border bg-muted/20 p-3">
+          <div className="mb-3 rounded-md border bg-background p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">Colchon de liquidez mensual</p>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={liquidityFloorMode === 'auto' ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => onLiquidityFloorModeChange('auto')}
+                >
+                  Auto
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={liquidityFloorMode === 'manual' ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => onLiquidityFloorModeChange('manual')}
+                >
+                  Manual
+                </Button>
+              </div>
+            </div>
+            {liquidityFloorMode === 'manual' && (
+              <div className="mb-2">
+                <label className="text-[11px] text-muted-foreground">Monto minimo a conservar</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={liquidityFloor}
+                  onChange={(event) => {
+                    const next = Number(event.target.value);
+                    if (!Number.isFinite(next)) return;
+                    onManualLiquidityFloorChange(Math.max(0, Math.floor(next)));
+                  }}
+                  className="mt-1"
+                />
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={liquidityFloor === autoLiquidityFloor ? 'default' : 'outline'}
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => onManualLiquidityFloorChange(autoLiquidityFloor)}
+                  >
+                    1x gastos fijos (${autoLiquidityFloor.toLocaleString('es-MX')})
+                  </Button>
+                  {[500, 1000, 2000].map((preset) => (
+                    <Button
+                      key={`liquidity-preset-${preset}`}
+                      type="button"
+                      size="sm"
+                      variant={liquidityFloor === preset ? 'default' : 'outline'}
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => onManualLiquidityFloorChange(preset)}
+                    >
+                      ${preset.toLocaleString('es-MX')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Colchon activo: ${formatCurrency(liquidityFloor)}
+            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">Incertidumbre por ingresos variables (portfolio real)</p>
+              <div className="flex items-center gap-1">
+                {[10, 20, 30].map((value) => (
+                  <Button
+                    key={`income-delta-${value}`}
+                    type="button"
+                    size="sm"
+                    variant={variableIncomeDeltaPct === value ? 'default' : 'outline'}
+                    className="h-7 px-2 text-xs"
+                    onClick={() => onVariableIncomeDeltaChange(value)}
+                  >
+                    {value}%
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div>
+                <p className="text-[11px] text-muted-foreground">Optimista (+{variableIncomeDeltaPct}%)</p>
+                <p className="text-sm font-semibold capitalize">
+                  {optimisticPortfolioMonths ? formatEstimatedDate(optimisticPortfolioMonths) : 'Sin salida'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Base</p>
+                <p className="text-sm font-semibold capitalize">
+                  {basePortfolioMonths ? formatEstimatedDate(basePortfolioMonths) : 'Sin salida'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Conservador (-{variableIncomeDeltaPct}%)</p>
+                <p className="text-sm font-semibold capitalize">
+                  {conservativePortfolioMonths ? formatEstimatedDate(conservativePortfolioMonths) : 'Sin salida'}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium text-muted-foreground">Escenarios de proyeccion</p>
             <div className="flex items-center gap-1">
@@ -293,6 +423,11 @@ export function DebtHealthCard({
                 )}
               </div>
             </div>
+            {maxWhatIfExtra <= 0 && liquidityFloor > 0 && (
+              <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                Extra bloqueado por seguridad: debes conservar un colchon minimo de ${formatCurrency(liquidityFloor)} este mes.
+              </p>
+            )}
           </div>
         </div>
       )}

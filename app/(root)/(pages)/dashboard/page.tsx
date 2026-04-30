@@ -14,7 +14,7 @@ import type { Expense } from '@/lib/actions/expenses.action';
 import type { Debt } from '@/lib/actions/debts.action';
 import { calculateAvalanche } from '@/lib/avalanche';
 import type { AvalancheResult } from '@/lib/avalanche';
-import { calculateMonthlyBudget, calculateWeightedInterestRate } from '@/lib/payoff';
+import { calculateMonthlyBudget, calculateWeightedInterestRate, simulatePortfolio } from '@/lib/payoff';
 import { SummaryCard } from '@/components/dashboard/SummaryCard';
 import { NextDebtCard } from '@/components/dashboard/NextDebtCard';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
@@ -30,6 +30,9 @@ import { SummarySkeleton, ChartSkeleton } from '@/components/incomes/Skeletons';
 const ONBOARDING_STORAGE_KEY = 'debtflow_onboarding_completed_v1';
 const MONTH_CLOSURES_STORAGE_KEY = 'debtflow_month_closures_v1';
 const BLOCKED_CUT_CATEGORIES_STORAGE_KEY = 'debtflow_blocked_cut_categories_v1';
+const VARIABLE_INCOME_DELTA_STORAGE_KEY = 'debtflow_variable_income_delta_pct_v1';
+const LIQUIDITY_FLOOR_MODE_STORAGE_KEY = 'debtflow_liquidity_floor_mode_v1';
+const LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY = 'debtflow_liquidity_floor_manual_v1';
 
 interface MonthClosureSnapshot {
   monthKey: string;
@@ -182,6 +185,9 @@ const Dashboard = () => {
   const [showMonthCloseDialog, setShowMonthCloseDialog] = useState(false);
   const [monthClosures, setMonthClosures] = useState<Record<string, MonthClosureSnapshot>>({});
   const [blockedCutCategories, setBlockedCutCategories] = useState<string[]>([]);
+  const [variableIncomeDeltaPct, setVariableIncomeDeltaPct] = useState(20);
+  const [liquidityFloorMode, setLiquidityFloorMode] = useState<'auto' | 'manual'>('auto');
+  const [manualLiquidityFloor, setManualLiquidityFloor] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -219,6 +225,43 @@ const Dashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem(VARIABLE_INCOME_DELTA_STORAGE_KEY);
+    if (!stored) return;
+
+    const parsed = Number(stored);
+    if ([10, 20, 30].includes(parsed)) {
+      setVariableIncomeDeltaPct(parsed);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(VARIABLE_INCOME_DELTA_STORAGE_KEY, String(variableIncomeDeltaPct));
+  }, [variableIncomeDeltaPct]);
+
+  useEffect(() => {
+    const mode = window.localStorage.getItem(LIQUIDITY_FLOOR_MODE_STORAGE_KEY);
+    if (mode === 'auto' || mode === 'manual') {
+      setLiquidityFloorMode(mode);
+    }
+
+    const manual = window.localStorage.getItem(LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY);
+    if (manual) {
+      const parsed = Number(manual);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        setManualLiquidityFloor(Math.floor(parsed));
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(LIQUIDITY_FLOOR_MODE_STORAGE_KEY, liquidityFloorMode);
+  }, [liquidityFloorMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY, String(manualLiquidityFloor));
+  }, [manualLiquidityFloor]);
+
   const handleToggleBlockedCutCategory = (categoryValue: string) => {
     const updated = blockedCutCategories.includes(categoryValue)
       ? blockedCutCategories.filter((value) => value !== categoryValue)
@@ -247,7 +290,12 @@ const Dashboard = () => {
   const currentMonthExpenses = filterByMonth(expenses, selectedDate, 'date');
 
   const monthlyIncomeTotal = currentMonthIncomes.reduce((s, i) => s + i.amount, 0);
+  const monthlyFixedIncome = currentMonthIncomes.filter((income) => income.type === 'fixed').reduce((s, i) => s + i.amount, 0);
+  const monthlyVariableIncome = currentMonthIncomes.filter((income) => income.type === 'variable').reduce((s, i) => s + i.amount, 0);
   const monthlyExpenseTotal = currentMonthExpenses.reduce((s, e) => s + e.amount, 0);
+  const monthlyFixedExpenses = currentMonthExpenses
+    .filter((expense) => expense.is_recurring)
+    .reduce((sum, expense) => sum + expense.amount, 0);
   const monthlyDebtPayments = activeDebts.reduce((s, d) => s + d.minimum_payment, 0);
 
   // ── Prvious month data for trend calculation ─────────────────────────
@@ -323,6 +371,20 @@ const Dashboard = () => {
     : 0;
 
   const monthlyBudget = calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal);
+  const autoLiquidityFloor = monthlyFixedExpenses > 0 ? monthlyFixedExpenses : Math.round(monthlyExpenseTotal * 0.5);
+  const liquidityFloor = liquidityFloorMode === 'manual' ? manualLiquidityFloor : autoLiquidityFloor;
+  const optimisticMonthlyBudget = calculateMonthlyBudget(
+    monthlyFixedIncome + monthlyVariableIncome * (1 + variableIncomeDeltaPct / 100),
+    monthlyExpenseTotal,
+  );
+  const conservativeMonthlyBudget = calculateMonthlyBudget(
+    monthlyFixedIncome + monthlyVariableIncome * (1 - variableIncomeDeltaPct / 100),
+    monthlyExpenseTotal,
+  );
+
+  const basePortfolioProjection = simulatePortfolio(activeDebts, 'avalanche', monthlyBudget);
+  const optimisticPortfolioProjection = simulatePortfolio(activeDebts, 'avalanche', optimisticMonthlyBudget);
+  const conservativePortfolioProjection = simulatePortfolio(activeDebts, 'avalanche', conservativeMonthlyBudget);
   const dashboardNarrative = !avalanche
     ? 'Empieza registrando tus deudas para activar recomendaciones personalizadas de pago.'
     : avalanche.mode === 'NO_BUDGET'
@@ -571,6 +633,16 @@ const Dashboard = () => {
               monthlyAvailableFlow={currentAvailableFlow}
               sumMinimums={avalanche.sumMinimums}
               weightedInterestRateAnnual={weightedInterestRateAnnual}
+              liquidityFloor={liquidityFloor}
+              autoLiquidityFloor={autoLiquidityFloor}
+              basePortfolioMonths={basePortfolioProjection?.months ?? null}
+              optimisticPortfolioMonths={optimisticPortfolioProjection?.months ?? null}
+              conservativePortfolioMonths={conservativePortfolioProjection?.months ?? null}
+              variableIncomeDeltaPct={variableIncomeDeltaPct}
+              onVariableIncomeDeltaChange={setVariableIncomeDeltaPct}
+              liquidityFloorMode={liquidityFloorMode}
+              onLiquidityFloorModeChange={setLiquidityFloorMode}
+              onManualLiquidityFloorChange={setManualLiquidityFloor}
             />
           )}
 
