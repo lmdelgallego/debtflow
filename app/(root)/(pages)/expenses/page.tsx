@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus } from 'lucide-react'
 import { MonthSelector } from '@/components/ui/MonthSelector'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import { fetchExpenses, fetchAllExpenses, deleteExpense } from '@/lib/actions/expenses.action'
+import { fetchExpenses, fetchAllExpenses, deleteExpense, deleteDebtExpense } from '@/lib/actions/expenses.action'
 import type { Expense } from '@/lib/actions/expenses.action'
+import { fetchAllDebts } from '@/lib/actions/debts.action'
+import type { Debt } from '@/lib/actions/debts.action'
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog'
 import { ExpenseSummaryCards } from '@/components/expenses/ExpenseSummaryCards'
 import { ExpenseTable } from '@/components/expenses/ExpenseTable'
@@ -39,6 +41,7 @@ const ExpensesPage = () => {
   const { addToast } = useToast()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [allExpenses, setAllExpenses] = useState<Expense[]>([])
+  const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingCharts, setLoadingCharts] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -80,6 +83,13 @@ const ExpensesPage = () => {
     setLoadingCharts(false)
   }, [selectedDateString])
 
+  const loadDebts = useCallback(async () => {
+    const { data, error: fetchError } = await fetchAllDebts()
+    if (!fetchError && data) {
+      setDebts(data)
+    }
+  }, [])
+
   useEffect(() => {
     loadExpenses()
   }, [loadExpenses])
@@ -87,6 +97,10 @@ const ExpensesPage = () => {
   useEffect(() => {
     loadAllExpenses()
   }, [loadAllExpenses])
+
+  useEffect(() => {
+    loadDebts()
+  }, [loadDebts])
 
   const openCreateDialog = () => {
     setEditingExpense(null)
@@ -101,6 +115,7 @@ const ExpensesPage = () => {
   const handleDialogSuccess = () => {
     loadExpenses()
     loadAllExpenses()
+    loadDebts()
   }
 
   const handleDeleteExpense = (id: string) => {
@@ -111,7 +126,20 @@ const ExpensesPage = () => {
     if (!confirmModal.id) return
 
     try {
-      const { success, error: deleteError } = await deleteExpense(confirmModal.id)
+      const expenseToDelete = expenses.find(e => e.id === confirmModal.id) || allExpenses.find(e => e.id === confirmModal.id)
+      
+      let success: boolean
+      let deleteError: string | null
+      
+      if (expenseToDelete?.category === 'debt') {
+        const result = await deleteDebtExpense(confirmModal.id)
+        success = result.success
+        deleteError = result.error
+      } else {
+        const result = await deleteExpense(confirmModal.id)
+        success = result.success
+        deleteError = result.error
+      }
 
       if (deleteError) {
         addToast(deleteError, 'error')
@@ -119,6 +147,7 @@ const ExpensesPage = () => {
         setExpenses(expenses.filter(e => e.id !== confirmModal.id))
         addToast('Gasto eliminado correctamente', 'success')
         loadAllExpenses()
+        loadDebts()
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error desconocido'
@@ -277,6 +306,7 @@ const ExpensesPage = () => {
       {/* Expense Dialog */}
       <ExpenseDialog
         expense={editingExpense}
+        debts={debts}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSuccess={handleDialogSuccess}

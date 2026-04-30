@@ -220,12 +220,14 @@ interface MethodComparisonCardProps {
   debts: Debt[];
   totalIncome?: number;
   totalExpenses?: number;
+  monthLabel?: string;
 }
 
 export function MethodComparisonCard({
   debts,
   totalIncome = 0,
   totalExpenses = 0,
+  monthLabel,
 }: MethodComparisonCardProps) {
   const monthlyBudget = calculateMonthlyBudget(totalIncome, totalExpenses);
 
@@ -250,7 +252,7 @@ export function MethodComparisonCard({
         <div>
           <h2 className="text-base font-semibold">Comparativo de Métodos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Proyección con{' '}
+            Simulación: {monthLabel || 'mes actual'} ·{' '}
             <span className="font-mono font-medium text-foreground">
               ${monthlyBudget.toLocaleString()}
             </span>{' '}

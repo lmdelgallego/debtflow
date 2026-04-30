@@ -348,3 +348,278 @@ export async function syncRecurringExpenses(): Promise<{ success: boolean; error
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido', count: 0 };
   }
 }
+
+/**
+ * Crea un gasto de deuda y actualiza el balance y mínimo de la deuda.
+ * Ejecuta ambas operaciones en una transacción.
+ */
+export async function createDebtExpense(input: {
+  debtId: string;
+  amount: number;
+  date: string;
+  description?: string;
+}): Promise<{ data: Expense | null; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: 'Usuario no autenticado' };
+    }
+
+    // First, get current debt data
+    const { data: debt, error: debtError } = await supabase
+      .from('debts')
+      .select('id, name, balance, minimum_payment')
+      .eq('id', input.debtId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (debtError || !debt) {
+      return { data: null, error: 'Deuda no encontrada' };
+    }
+
+    // Calculate new balance
+    const newBalance = Math.max(0, debt.balance - input.amount);
+
+    // Iniciar transacción (usando rpc para atomicidad)
+    // Primero insertar gasto
+    const { data: expense, error: expenseError } = await supabase
+      .from('expenses')
+      .insert([
+        {
+          user_id: user.id,
+          category: 'debt',
+          subcategory: input.debtId,
+          description: input.description || debt.name,
+          amount: input.amount,
+          date: input.date,
+          is_recurring: false,
+        },
+      ])
+      .select()
+      .single();
+
+    if (expenseError) {
+      return { data: null, error: expenseError.message };
+    }
+
+    // Luego actualizar deuda
+    const { error: updateDebtError } = await supabase
+      .from('debts')
+      .update({
+        balance: newBalance,
+        minimum_payment: input.amount,
+      })
+      .eq('id', input.debtId)
+      .eq('user_id', user.id);
+
+    if (updateDebtError) {
+      // Rollback: eliminar el gasto insertado
+      await supabase.from('expenses').delete().eq('id', expense.id);
+      return { data: null, error: 'Error al actualizar deuda: ' + updateDebtError.message };
+    }
+
+    return { data: expense, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Actualiza un gasto de deuda existente.
+ * Ajusta el balance de la deuda según la diferencia entre monto nuevo y anterior.
+ * Actualiza el mínimo al monto nuevo.
+ */
+export async function updateDebtExpense(input: {
+  expenseId: string;
+  debtId: string;
+  amount: number;
+  date: string;
+  description?: string;
+}): Promise<{ data: Expense | null; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { data: null, error: 'Usuario no autenticado' };
+    }
+
+    // Get current expense data
+    const { data: currentExpense, error: expenseError } = await supabase
+      .from('expenses')
+      .select('id, subcategory, amount')
+      .eq('id', input.expenseId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (expenseError || !currentExpense) {
+      return { data: null, error: 'Gasto no encontrado' };
+    }
+
+    const oldDebtId = currentExpense.subcategory;
+    const oldAmount = currentExpense.amount;
+    const amountDiff = input.amount - oldAmount;
+
+    // Get current debt data
+    const { data: debt, error: debtError } = await supabase
+      .from('debts')
+      .select('id, name, balance, minimum_payment')
+      .eq('id', input.debtId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (debtError || !debt) {
+      return { data: null, error: 'Deuda no encontrada' };
+    }
+
+    // Calculate new balance
+    const newBalance = Math.max(0, debt.balance - amountDiff);
+
+    // Update expense
+    const { data: expense, error: updateExpenseError } = await supabase
+      .from('expenses')
+      .update({
+        subcategory: input.debtId,
+        description: input.description || debt.name,
+        amount: input.amount,
+        date: input.date,
+      })
+      .eq('id', input.expenseId)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (updateExpenseError) {
+      return { data: null, error: updateExpenseError.message };
+    }
+
+    // Update debt with new balance and minimum
+    const { error: updateDebtError } = await supabase
+      .from('debts')
+      .update({
+        balance: newBalance,
+        minimum_payment: input.amount,
+      })
+      .eq('id', input.debtId)
+      .eq('user_id', user.id);
+
+    if (updateDebtError) {
+      return { data: null, error: 'Error al actualizar deuda: ' + updateDebtError.message };
+    }
+
+    // If changed to a different debt, restore old debt balance and update its minimum
+    if (oldDebtId && oldDebtId !== input.debtId) {
+      const { data: oldDebt, error: oldDebtError } = await supabase
+        .from('debts')
+        .select('id, balance, minimum_payment')
+        .eq('id', oldDebtId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!oldDebtError && oldDebt) {
+        const restoredBalance = oldDebt.balance + oldAmount;
+        // Update old debt: restore balance, and set its minimum to its current or a reasonable default
+        await supabase
+          .from('debts')
+          .update({
+            balance: restoredBalance,
+          })
+          .eq('id', oldDebtId)
+          .eq('user_id', user.id);
+      }
+    }
+
+    return { data: expense, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}
+
+/**
+ * Elimina un gasto de deuda y revierte el balance.
+ * El mínimo de la deuda queda como estaba (no se modifica al borrar).
+ */
+export async function deleteDebtExpense(expenseId: string): Promise<{ success: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: 'Usuario no autenticado' };
+    }
+
+    // Get current expense
+    const { data: expense, error: expenseError } = await supabase
+      .from('expenses')
+      .select('id, subcategory, amount')
+      .eq('id', expenseId)
+      .eq('user_id', user.id)
+      .eq('category', 'debt')
+      .single();
+
+    if (expenseError || !expense) {
+      return { success: false, error: 'Gasto de deuda no encontrado' };
+    }
+
+    const debtId = expense.subcategory;
+    const amount = expense.amount;
+
+    if (!debtId) {
+      // No debt to restore, just delete
+      const { error: deleteError } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId)
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        return { success: false, error: deleteError.message };
+      }
+      return { success: true, error: null };
+    }
+
+    // Get current debt data
+    const { data: debt, error: debtError } = await supabase
+      .from('debts')
+      .select('id, balance')
+      .eq('id', debtId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (debtError || !debt) {
+      // Delete expense anyway
+      await supabase.from('expenses').delete().eq('id', expenseId);
+      return { success: true, error: null };
+    }
+
+    // Delete expense first
+    const { error: deleteError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', expenseId)
+      .eq('user_id', user.id);
+
+    if (deleteError) {
+      return { success: false, error: deleteError.message };
+    }
+
+    // Restore balance
+    const restoredBalance = debt.balance + amount;
+
+    const { error: updateDebtError } = await supabase
+      .from('debts')
+      .update({ balance: restoredBalance })
+      .eq('id', debtId)
+      .eq('user_id', user.id);
+
+    if (updateDebtError) {
+      return { success: false, error: 'Error al restaurar balance: ' + updateDebtError.message };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
+  }
+}

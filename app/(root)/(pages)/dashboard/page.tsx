@@ -68,10 +68,9 @@ function formatDelta(value: number) {
   return `${value >= 0 ? '+' : '-'}$${abs}`;
 }
 
-function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[]) {
+function buildMonthlyData(incomes: Income[], expenses: Expense[], activeDebts: Debt[]) {
   const months: Record<string, { ingresos: number; gastos: number; minimos: number }> = {};
 
-  // Ensure the last 6 months are always present in the chart
   const today = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
@@ -82,15 +81,23 @@ function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[])
   for (const income of incomes) {
     const d = new Date(income.created_at);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (!months[key]) months[key] = { ingresos: 0, gastos: 0, minimos: 0 };
-    months[key].ingresos += income.amount;
+    if (months[key]) months[key].ingresos += income.amount;
   }
 
   for (const expense of expenses) {
+    // Only include non-debt expenses in gastos to avoid double counting
+    if (expense.category === 'debt') continue;
     const d = new Date(expense.date || expense.created_at);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    if (!months[key]) months[key] = { ingresos: 0, gastos: 0, minimos: 0 };
-    months[key].gastos += expense.amount;
+    if (months[key]) months[key].gastos += expense.amount;
+  }
+
+  for (const expense of expenses) {
+    if (expense.category === 'debt') {
+      const d = new Date(expense.date || expense.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (months[key]) months[key].minimos += expense.amount;
+    }
   }
 
   const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -103,29 +110,11 @@ function buildMonthlyData(incomes: Income[], expenses: Expense[], debts: Debt[])
       const year = parseInt(y);
       const monthIndex = parseInt(mStr) - 1;
 
-      const endOfMonth = new Date(year, monthIndex + 1, 0, 23, 59, 59);
-
-      let minimos = 0;
-      for (const debt of debts) {
-        const createdAt = new Date(debt.created_at);
-        if (createdAt <= endOfMonth) {
-          const paymentsAfter = expenses
-            .filter((e) => e.category === 'debt' && e.subcategory === debt.name)
-            .filter((e) => new Date(e.date || e.created_at) > endOfMonth)
-            .reduce((sum, e) => sum + e.amount, 0);
-
-          const pastBalance = debt.balance + paymentsAfter;
-          if (pastBalance > 0) {
-            minimos += debt.minimum_payment;
-          }
-        }
-      }
-
       return {
         month: monthNames[monthIndex],
         ingresos: months[key].ingresos,
         gastos: months[key].gastos,
-        minimos,
+        minimos: months[key].minimos,
       };
     });
 }
@@ -183,11 +172,36 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showMonthCloseDialog, setShowMonthCloseDialog] = useState(false);
-  const [monthClosures, setMonthClosures] = useState<Record<string, MonthClosureSnapshot>>({});
-  const [blockedCutCategories, setBlockedCutCategories] = useState<string[]>([]);
-  const [variableIncomeDeltaPct, setVariableIncomeDeltaPct] = useState(20);
-  const [liquidityFloorMode, setLiquidityFloorMode] = useState<'auto' | 'manual'>('auto');
-  const [manualLiquidityFloor, setManualLiquidityFloor] = useState(0);
+  const [monthClosures, setMonthClosures] = useState<Record<string, MonthClosureSnapshot>>(() => {
+    if (typeof window === 'undefined') return {};
+    const raw = window.localStorage.getItem(MONTH_CLOSURES_STORAGE_KEY);
+    if (!raw) return {};
+    try { return JSON.parse(raw) as Record<string, MonthClosureSnapshot>; } catch { return {}; }
+  });
+  const [blockedCutCategories, setBlockedCutCategories] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const raw = window.localStorage.getItem(BLOCKED_CUT_CATEGORIES_STORAGE_KEY);
+    if (!raw) return [];
+    try { return JSON.parse(raw) as string[]; } catch { return []; }
+  });
+  const [variableIncomeDeltaPct, setVariableIncomeDeltaPct] = useState(() => {
+    if (typeof window === 'undefined') return 20;
+    const stored = window.localStorage.getItem(VARIABLE_INCOME_DELTA_STORAGE_KEY);
+    const parsed = Number(stored);
+    return [10, 20, 30].includes(parsed) ? parsed : 20;
+  });
+  const [liquidityFloorMode, setLiquidityFloorMode] = useState<'auto' | 'manual'>(() => {
+    if (typeof window === 'undefined') return 'auto';
+    const mode = window.localStorage.getItem(LIQUIDITY_FLOOR_MODE_STORAGE_KEY);
+    return mode === 'auto' || mode === 'manual' ? mode : 'auto';
+  });
+  const [manualLiquidityFloor, setManualLiquidityFloor] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = window.localStorage.getItem(LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY);
+    if (!stored) return 0;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -214,45 +228,8 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    const rawBlocked = window.localStorage.getItem(BLOCKED_CUT_CATEGORIES_STORAGE_KEY);
-    if (!rawBlocked) return;
-
-    try {
-      const parsed = JSON.parse(rawBlocked) as string[];
-      setBlockedCutCategories(parsed);
-    } catch {
-      setBlockedCutCategories([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(VARIABLE_INCOME_DELTA_STORAGE_KEY);
-    if (!stored) return;
-
-    const parsed = Number(stored);
-    if ([10, 20, 30].includes(parsed)) {
-      setVariableIncomeDeltaPct(parsed);
-    }
-  }, []);
-
-  useEffect(() => {
     window.localStorage.setItem(VARIABLE_INCOME_DELTA_STORAGE_KEY, String(variableIncomeDeltaPct));
   }, [variableIncomeDeltaPct]);
-
-  useEffect(() => {
-    const mode = window.localStorage.getItem(LIQUIDITY_FLOOR_MODE_STORAGE_KEY);
-    if (mode === 'auto' || mode === 'manual') {
-      setLiquidityFloorMode(mode);
-    }
-
-    const manual = window.localStorage.getItem(LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY);
-    if (manual) {
-      const parsed = Number(manual);
-      if (Number.isFinite(parsed) && parsed >= 0) {
-        setManualLiquidityFloor(Math.floor(parsed));
-      }
-    }
-  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(LIQUIDITY_FLOOR_MODE_STORAGE_KEY, liquidityFloorMode);
@@ -279,12 +256,6 @@ const Dashboard = () => {
     setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  const totalIncomes = incomes.reduce((s, i) => s + i.amount, 0);
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const activeDebts = debts.filter((d) => d.balance > 0);
-  const totalDebt = activeDebts.reduce((s, d) => s + d.balance, 0);
-  const weightedInterestRateAnnual = calculateWeightedInterestRate(activeDebts);
-
   // ── Monthly cash flow (selected month) ─────────────────────────────
   const currentMonthIncomes = filterByMonth(incomes, selectedDate, 'created_at');
   const currentMonthExpenses = filterByMonth(expenses, selectedDate, 'date');
@@ -292,20 +263,37 @@ const Dashboard = () => {
   const monthlyIncomeTotal = currentMonthIncomes.reduce((s, i) => s + i.amount, 0);
   const monthlyFixedIncome = currentMonthIncomes.filter((income) => income.type === 'fixed').reduce((s, i) => s + i.amount, 0);
   const monthlyVariableIncome = currentMonthIncomes.filter((income) => income.type === 'variable').reduce((s, i) => s + i.amount, 0);
-  const monthlyExpenseTotal = currentMonthExpenses.reduce((s, e) => s + e.amount, 0);
+  
+  // Debt payments this month (actual recorded expenses)
+  const currentMonthDebtExpenses = currentMonthExpenses.filter(e => e.category === 'debt');
+  const monthlyDebtPayments = currentMonthDebtExpenses.reduce((s, e) => s + e.amount, 0);
+  
+  // Regular expenses excluding debt payments (to avoid double counting)
+  const monthlyExpenseTotal = currentMonthExpenses
+    .filter(e => e.category !== 'debt')
+    .reduce((s, e) => s + e.amount, 0);
   const monthlyFixedExpenses = currentMonthExpenses
-    .filter((expense) => expense.is_recurring)
+    .filter((expense) => expense.is_recurring && expense.category !== 'debt')
     .reduce((sum, expense) => sum + expense.amount, 0);
-  const monthlyDebtPayments = activeDebts.reduce((s, d) => s + d.minimum_payment, 0);
 
-  // ── Prvious month data for trend calculation ─────────────────────────
+  // ── Active debts (current balance > 0) ─────────────────────────
+  const activeDebts = debts.filter((d) => d.balance > 0);
+  const totalDebt = activeDebts.reduce((s, d) => s + d.balance, 0);
+  const weightedInterestRateAnnual = calculateWeightedInterestRate(activeDebts);
+
+  // ── Previous month data for trend calculation ─────────────────────────
   const prevMonthDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
   const prevMonthIncomes = filterByMonth(incomes, prevMonthDate, 'created_at');
   const prevMonthExpenses = filterByMonth(expenses, prevMonthDate, 'date');
 
   const prevMonthlyIncomeTotal = prevMonthIncomes.reduce((s, i) => s + i.amount, 0);
-  const prevMonthlyExpenseTotal = prevMonthExpenses.reduce((s, e) => s + e.amount, 0);
-  const prevAvailableFlow = calculateMonthlyBudget(prevMonthlyIncomeTotal, prevMonthlyExpenseTotal) - monthlyDebtPayments;
+  const prevMonthDebtExpenses = prevMonthExpenses.filter(e => e.category === 'debt');
+  const prevMonthlyDebtPayments = prevMonthDebtExpenses.reduce((s, e) => s + e.amount, 0);
+  const prevMonthlyExpenseTotal = prevMonthExpenses
+    .filter(e => e.category !== 'debt')
+    .reduce((s, e) => s + e.amount, 0);
+  
+  const prevAvailableFlow = calculateMonthlyBudget(prevMonthlyIncomeTotal, prevMonthlyExpenseTotal) - prevMonthlyDebtPayments;
   const currentAvailableFlow = calculateMonthlyBudget(monthlyIncomeTotal, monthlyExpenseTotal) - monthlyDebtPayments;
 
   const incomeTrend = {
@@ -365,7 +353,7 @@ const Dashboard = () => {
     });
 
   const avalanche: AvalancheResult | null =
-    activeDebts.length > 0 ? calculateAvalanche(debts, totalIncomes, totalExpenses) : null;
+    activeDebts.length > 0 ? calculateAvalanche(debts, monthlyIncomeTotal, monthlyExpenseTotal) : null;
   const projectedDebtPayment = avalanche
     ? avalanche.recommendedPayments.reduce((sum, payment) => sum + payment.recommendedPayment, 0)
     : 0;
@@ -395,9 +383,10 @@ const Dashboard = () => {
     ? `Vas bien: cubres minimos y tienes ${currentAvailableFlow.toLocaleString('es-MX')} de flujo para acelerar tu deuda objetivo.`
     : 'Tu flujo disponible es negativo este mes. Ajusta gastos para proteger tu plan de pago.';
 
+  // Build sparklines from all data (last 6 months as configured in buildSparkline)
   const incomeSparkline = buildSparkline(incomes, 'created_at');
   const expenseSparkline = buildSparkline(expenses, 'date');
-  const monthlyData = buildMonthlyData(incomes, expenses, debts);
+  const monthlyData = buildMonthlyData(incomes, expenses, activeDebts);
 
   const hasData = incomes.length > 0 || expenses.length > 0 || debts.length > 0;
   const isMonthClosed = !!monthClosures[monthKey];
@@ -420,6 +409,7 @@ const Dashboard = () => {
       }
     : null;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (loading || hasData) return;
     const onboardingCompleted = window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
@@ -443,22 +433,11 @@ const Dashboard = () => {
       setShowOnboarding(false);
     }
   }, [loading, incomes.length, expenses.length, debts.length, showOnboarding]);
+/* eslint-enable react-hooks/set-state-in-effect */
 
   const handleOnboardingComplete = () => {
     window.localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
   };
-
-  useEffect(() => {
-    const rawClosures = window.localStorage.getItem(MONTH_CLOSURES_STORAGE_KEY);
-    if (!rawClosures) return;
-
-    try {
-      const parsed = JSON.parse(rawClosures) as Record<string, MonthClosureSnapshot>;
-      setMonthClosures(parsed);
-    } catch {
-      setMonthClosures({});
-    }
-  }, []);
 
   const handleCloseMonth = () => {
     if (isMonthClosed) {

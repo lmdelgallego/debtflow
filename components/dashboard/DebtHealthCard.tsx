@@ -62,32 +62,25 @@ export function DebtHealthCard({
   onLiquidityFloorModeChange,
   onManualLiquidityFloorChange,
 }: DebtHealthCardProps) {
-  const [scenarioDelta, setScenarioDelta] = useState(10);
-  const [whatIfExtra, setWhatIfExtra] = useState(0);
-  const [timelineVisible, setTimelineVisible] = useState(false);
-
-  useEffect(() => {
+  const [scenarioDelta, setScenarioDelta] = useState(() => {
+    if (typeof window === 'undefined') return 10;
     const stored = window.localStorage.getItem(SCENARIO_DELTA_STORAGE_KEY);
-    if (!stored) return;
-
+    if (!stored) return 10;
     const parsed = Number(stored);
-    if ([5, 10, 15].includes(parsed)) {
-      setScenarioDelta(parsed);
-    }
-  }, []);
+    return [5, 10, 15].includes(parsed) ? parsed : 10;
+  });
+  const [whatIfExtra, setWhatIfExtra] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = window.localStorage.getItem(WHAT_IF_EXTRA_STORAGE_KEY);
+    if (!stored) return 0;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  });
+  const [timelineVisible, setTimelineVisible] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem(SCENARIO_DELTA_STORAGE_KEY, String(scenarioDelta));
   }, [scenarioDelta]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(WHAT_IF_EXTRA_STORAGE_KEY);
-    if (!stored) return;
-    const parsed = Number(stored);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      setWhatIfExtra(parsed);
-    }
-  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(WHAT_IF_EXTRA_STORAGE_KEY, String(whatIfExtra));

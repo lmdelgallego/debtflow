@@ -179,12 +179,14 @@ interface DebtTargetCardProps {
   debts: Debt[];
   totalIncome?: number;
   totalExpenses?: number;
+  monthLabel?: string;
 }
 
 export function DebtTargetCard({
   debts,
   totalIncome = 0,
   totalExpenses = 0,
+  monthLabel,
 }: DebtTargetCardProps) {
   const [method, setMethod] = useState<PayoffMethod>('avalanche');
 
@@ -212,6 +214,7 @@ export function DebtTargetCard({
               <p className="text-xs text-muted-foreground mt-0.5">
                 {activeDebts.length} deuda{activeDebts.length === 1 ? '' : 's'} activa
                 {activeDebts.length === 1 ? '' : 's'}
+                {monthLabel && <span className="ml-2">· Simulación: {monthLabel}</span>}
               </p>
             )}
           </div>
