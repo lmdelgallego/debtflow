@@ -3,6 +3,7 @@ import type { Debt } from '@/lib/actions/debts.action';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type PayoffMethod = 'avalanche' | 'snowball';
+export type BudgetHealthMode = 'NORMAL' | 'CRISIS_NO_MINIMUMS' | 'NO_BUDGET';
 
 export interface SingleDebtProjection {
   /** Monthly payment used for this projection */
@@ -30,6 +31,25 @@ export interface MethodComparison {
   interestDelta: number;
 }
 
+export interface SimplePayoffEstimateInput {
+  totalDebt: number;
+  monthlyPayment: number;
+  monthlyRate: number;
+}
+
+export function calculateMonthlyBudget(totalIncome: number, totalExpenses: number): number {
+  return Math.max(0, totalIncome - totalExpenses);
+}
+
+export function determineBudgetHealthMode(
+  monthlyBudget: number,
+  sumMinimums: number,
+): BudgetHealthMode {
+  if (monthlyBudget <= 0) return 'NO_BUDGET';
+  if (monthlyBudget < sumMinimums) return 'CRISIS_NO_MINIMUMS';
+  return 'NORMAL';
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function sortDebts(debts: Debt[], method: PayoffMethod): Debt[] {
@@ -48,6 +68,52 @@ function sortDebts(debts: Debt[], method: PayoffMethod): Debt[] {
   );
 }
 
+export function calculateWeightedInterestRate(debts: Debt[]): number {
+  const activeDebts = debts.filter((debt) => debt.balance > 0);
+  const totalDebt = activeDebts.reduce((sum, debt) => sum + debt.balance, 0);
+
+  if (totalDebt <= 0) return 0;
+
+  return (
+    activeDebts.reduce((sum, debt) => sum + debt.interest_rate * debt.balance, 0) /
+    totalDebt
+  );
+}
+
+export function simulateDebtPayoffMonths({
+  totalDebt,
+  monthlyPayment,
+  monthlyRate,
+}: SimplePayoffEstimateInput): number | null {
+  if (totalDebt <= 0 || monthlyPayment <= 0) return null;
+
+  if (monthlyRate === 0) {
+    return Math.ceil(totalDebt / monthlyPayment);
+  }
+
+  let remainingDebt = totalDebt;
+  let months = 0;
+  const maxMonths = 1200;
+
+  while (remainingDebt > 0 && months < maxMonths) {
+    const monthlyInterest = remainingDebt * monthlyRate;
+    if (monthlyPayment <= monthlyInterest) {
+      return null;
+    }
+
+    remainingDebt = remainingDebt + monthlyInterest - monthlyPayment;
+    months += 1;
+  }
+
+  return remainingDebt <= 0 ? months : null;
+}
+
+export function estimatePayoffDateFromMonths(months: number): Date {
+  const payoffDate = new Date();
+  payoffDate.setMonth(payoffDate.getMonth() + months);
+  return payoffDate;
+}
+
 // ─── Single debt payoff projection ───────────────────────────────────────────
 
 /**
@@ -62,40 +128,29 @@ export function projectSingleDebt(
 
   const monthlyRate = debt.interest_rate / 100 / 12;
 
-  // Check if payment covers at least the monthly interest
-  const monthlyInterestOnly = debt.balance * monthlyRate;
-  if (monthlyPayment <= monthlyInterestOnly && debt.interest_rate > 0) {
-    // Payment doesn't even cover interest — debt grows forever
-    return null;
-  }
+  const months = simulateDebtPayoffMonths({
+    totalDebt: debt.balance,
+    monthlyPayment,
+    monthlyRate,
+  });
 
-  let months: number;
+  if (!months) return null;
+
   let totalInterest = 0;
+  let balance = debt.balance;
+  let elapsed = 0;
 
-  if (monthlyRate === 0) {
-    months = Math.ceil(debt.balance / monthlyPayment);
-    totalInterest = 0;
-  } else {
-    // Analytical: n = -ln(1 - (B*r)/P) / ln(1 + r)
-    months = Math.ceil(
-      -Math.log(1 - (debt.balance * monthlyRate) / monthlyPayment) /
-        Math.log(1 + monthlyRate),
-    );
-    // Simulate to get exact interest paid
-    let balance = debt.balance;
-    for (let m = 0; m < months; m++) {
-      const interest = balance * monthlyRate;
-      totalInterest += interest;
-      balance += interest;
-      balance -= Math.min(monthlyPayment, balance);
-      balance = Math.max(0, Math.round(balance * 100) / 100);
-      if (balance === 0) break;
-    }
+  while (balance > 0 && elapsed < months) {
+    const interest = balance * monthlyRate;
+    totalInterest += interest;
+    balance += interest;
+    balance -= Math.min(monthlyPayment, balance);
+    balance = Math.max(0, Math.round(balance * 100) / 100);
+    elapsed += 1;
   }
 
   const totalPaid = debt.balance + totalInterest;
-  const payoffDate = new Date();
-  payoffDate.setMonth(payoffDate.getMonth() + months);
+  const payoffDate = estimatePayoffDateFromMonths(months);
 
   return {
     monthlyPayment,

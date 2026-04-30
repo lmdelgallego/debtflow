@@ -1,4 +1,5 @@
 import type { Debt } from '@/lib/actions/debts.action';
+import { calculateMonthlyBudget, determineBudgetHealthMode } from '@/lib/payoff';
 
 export type AvalancheMode = 'NORMAL' | 'CRISIS_NO_MINIMUMS' | 'NO_BUDGET';
 
@@ -26,7 +27,7 @@ export function calculateAvalanche(
   totalIncome: number,
   totalExpenses: number
 ): AvalancheResult {
-  const budget = Math.max(0, totalIncome - totalExpenses);
+  const budget = calculateMonthlyBudget(totalIncome, totalExpenses);
 
   // Filter active debts (balance > 0)
   const activeDebts = debts.filter((d) => d.balance > 0);
@@ -41,15 +42,7 @@ export function calculateAvalanche(
 
   const sumMinimums = orderedDebts.reduce((sum, d) => sum + d.minimum_payment, 0);
 
-  // Determine mode
-  let mode: AvalancheMode;
-  if (budget === 0) {
-    mode = 'NO_BUDGET';
-  } else if (budget < sumMinimums) {
-    mode = 'CRISIS_NO_MINIMUMS';
-  } else {
-    mode = 'NORMAL';
-  }
+  const mode = determineBudgetHealthMode(budget, sumMinimums);
 
   const recommendedPayments: RecommendedPayment[] = [];
   let nextTargetDebtId: string | null = null;

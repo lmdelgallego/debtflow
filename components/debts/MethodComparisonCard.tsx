@@ -13,7 +13,7 @@ import {
   Banknote,
 } from 'lucide-react';
 import type { Debt } from '@/lib/actions/debts.action';
-import { compareMethodsPayoff, formatMonths, formatPayoffDate } from '@/lib/payoff';
+import { calculateMonthlyBudget, compareMethodsPayoff, formatMonths, formatPayoffDate } from '@/lib/payoff';
 import type { PortfolioProjection } from '@/lib/payoff';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -220,14 +220,16 @@ interface MethodComparisonCardProps {
   debts: Debt[];
   totalIncome?: number;
   totalExpenses?: number;
+  monthLabel?: string;
 }
 
 export function MethodComparisonCard({
   debts,
   totalIncome = 0,
   totalExpenses = 0,
+  monthLabel,
 }: MethodComparisonCardProps) {
-  const monthlyBudget = Math.max(0, totalIncome - totalExpenses);
+  const monthlyBudget = calculateMonthlyBudget(totalIncome, totalExpenses);
 
   const comparison = useMemo(
     () => compareMethodsPayoff(debts, monthlyBudget),
@@ -250,7 +252,7 @@ export function MethodComparisonCard({
         <div>
           <h2 className="text-base font-semibold">Comparativo de Métodos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Proyección con{' '}
+            Simulación: {monthLabel || 'mes actual'} ·{' '}
             <span className="font-mono font-medium text-foreground">
               ${monthlyBudget.toLocaleString()}
             </span>{' '}
