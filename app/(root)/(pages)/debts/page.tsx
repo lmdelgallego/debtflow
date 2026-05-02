@@ -8,6 +8,7 @@ import { fetchDebts, fetchAllDebts, deleteDebt } from '@/lib/actions/debts.actio
 import type { Debt } from '@/lib/actions/debts.action';
 import { fetchAllIncomes } from '@/lib/actions/incomes.action';
 import { fetchAllExpenses } from '@/lib/actions/expenses.action';
+import { filterByMonth } from '@/hooks';
 import { DebtDialog } from '@/components/debts/DebtDialog';
 import { DebtSummaryCards } from '@/components/debts/DebtSummaryCards';
 import { DebtTargetCard } from '@/components/debts/DebtTargetCard';
@@ -18,22 +19,6 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { DebtSummarySkeleton, DebtTableSkeleton } from '@/components/debts/Skeletons';
 import { PageHeader } from '@/components/PageHeader';
 import { MonthSelector } from '@/components/ui/MonthSelector';
-
-function filterByMonth<T extends { created_at?: string; date?: string }>(
-  items: T[],
-  selectedDate: Date,
-  dateField: 'created_at' | 'date' = 'created_at',
-): T[] {
-  const currentYear = selectedDate.getFullYear();
-  const currentMonth = selectedDate.getMonth();
-
-  return items.filter((item) => {
-    const d = new Date(
-      (dateField === 'date' && 'date' in item ? item.date : item.created_at) || item.created_at || '',
-    );
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-  });
-}
 
 const Debts = () => {
   const { addToast } = useToast();
