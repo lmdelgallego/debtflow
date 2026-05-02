@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react';
 import { MonthSelector } from '@/components/ui/MonthSelector';
 import { fetchIncomes, fetchAllIncomes, deleteIncome } from '@/lib/actions/incomes.action';
 import type { Income } from '@/lib/actions/incomes.action';
+import { buildSparkline, buildMonthlyChartData, calculateTrend, filterByMonth } from '@/hooks';
 import { IncomeDialog } from '@/components/incomes/IncomeDialog';
 import { SummaryCards } from '@/components/incomes/SummaryCards';
 import { IncomeCharts } from '@/components/incomes/IncomeCharts';

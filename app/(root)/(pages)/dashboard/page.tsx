@@ -15,6 +15,12 @@ import type { Debt } from '@/lib/actions/debts.action';
 import { calculateAvalanche } from '@/lib/avalanche';
 import type { AvalancheResult } from '@/lib/avalanche';
 import { calculateMonthlyBudget, calculateWeightedInterestRate, simulatePortfolio } from '@/lib/payoff';
+import { 
+  filterByMonth, 
+  calculateTrend, 
+  buildSparkline,
+} from '@/hooks';
+import type { MonthClosureSnapshot } from '@/types/domain';
 import { SummaryCard } from '@/components/dashboard/SummaryCard';
 import { NextDebtCard } from '@/components/dashboard/NextDebtCard';
 import { CashFlowChart } from '@/components/dashboard/CashFlowChart';
@@ -33,18 +39,6 @@ const BLOCKED_CUT_CATEGORIES_STORAGE_KEY = 'debtflow_blocked_cut_categories_v1';
 const VARIABLE_INCOME_DELTA_STORAGE_KEY = 'debtflow_variable_income_delta_pct_v1';
 const LIQUIDITY_FLOOR_MODE_STORAGE_KEY = 'debtflow_liquidity_floor_mode_v1';
 const LIQUIDITY_FLOOR_MANUAL_STORAGE_KEY = 'debtflow_liquidity_floor_manual_v1';
-
-interface MonthClosureSnapshot {
-  monthKey: string;
-  monthLabel: string;
-  incomes: number;
-  expenses: number;
-  minimums: number;
-  availableFlow: number;
-  totalDebt: number;
-  activeDebts: number;
-  closedAt: string;
-}
 
 const CATEGORY_CUT_PRIORITY: Record<string, number> = {
   entertainment: 5,
@@ -117,49 +111,6 @@ function buildMonthlyData(incomes: Income[], expenses: Expense[], activeDebts: D
         minimos: months[key].minimos,
       };
     });
-}
-
-function buildSparkline(
-  items: Array<{ created_at?: string; date?: string; amount: number }>,
-  dateField: 'created_at' | 'date' = 'created_at',
-) {
-  const byMonth: Record<string, number> = {};
-  for (const item of items) {
-    const d = new Date(
-      (dateField === 'date' && 'date' in item ? item.date : item.created_at) || item.created_at || '',
-    );
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    byMonth[key] = (byMonth[key] || 0) + item.amount;
-  }
-  return Object.entries(byMonth)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-6)
-    .map(([, v]) => v);
-}
-
-function filterByMonth<T extends { created_at?: string; date?: string }>(
-  items: T[],
-  selectedDate: Date,
-  dateField: 'created_at' | 'date' = 'created_at',
-): T[] {
-  const currentYear = selectedDate.getFullYear();
-  const currentMonth = selectedDate.getMonth(); // 0-indexed
-
-  return items.filter((item) => {
-    const d = new Date(
-      (dateField === 'date' && 'date' in item ? item.date : item.created_at) || item.created_at || '',
-    );
-    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-  });
-}
-
-function calculateTrend(current: number, previous: number) {
-  if (previous === 0) {
-    if (current === 0) return { value: 0 };
-    return { value: 100 }; // 100% increase from 0
-  }
-  const diff = ((current - previous) / previous) * 100;
-  return { value: diff };
 }
 
 const Dashboard = () => {

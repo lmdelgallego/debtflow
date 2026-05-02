@@ -10,6 +10,11 @@ import { fetchExpenses, fetchAllExpenses, deleteExpense, deleteDebtExpense } fro
 import type { Expense } from '@/lib/actions/expenses.action'
 import { fetchAllDebts } from '@/lib/actions/debts.action'
 import type { Debt } from '@/lib/actions/debts.action'
+import { 
+  useFinancialData, 
+  filterByMonth, 
+  calculateCategoryTotals,
+} from '@/hooks'
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog'
 import { ExpenseSummaryCards } from '@/components/expenses/ExpenseSummaryCards'
 import { ExpenseTable } from '@/components/expenses/ExpenseTable'
